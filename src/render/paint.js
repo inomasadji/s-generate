@@ -1,4 +1,5 @@
 import { LOGICAL_SIZE } from './layout.js';
+import { PLATE_AREA } from './plate.js';
 
 /**
  * Растеризация display list. Слой намеренно тонкий: ни форм, ни случайности.
@@ -33,6 +34,15 @@ export function paint(ctx, displayList, view) {
   ctx.clip();
 
   if (typeof displayList.backdrop !== 'string') paintSky(ctx, displayList.backdrop);
+
+  if (displayList.plateBackground) {
+    const { x, y, width, height } = PLATE_AREA;
+    const gradient = ctx.createLinearGradient(0, y, 0, y + height);
+    gradient.addColorStop(0, displayList.plateBackground.top);
+    gradient.addColorStop(1, displayList.plateBackground.bottom);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, width, height);
+  }
 
   // 3. Слои: сначала все полигоны слоя, потом контур силуэта этого слоя.
   //    Так спрятанный контур (верх ножки под шляпкой) не просвечивает.

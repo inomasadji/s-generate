@@ -1,5 +1,8 @@
 import { pick, int, rngStream } from '../../core/rng.js';
 import { ENDINGS, ONSETS, VOWELS } from './syllables.js';
+import { slugify } from './slug.js';
+
+export { slugify };
 
 /**
  * Слоговый генератор латинских названий. Цепь Маркова из исходной статьи
@@ -48,19 +51,6 @@ function buildWord(rng, count) {
  */
 function capitalize(word) {
   return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
-/**
- * @param {string} text
- * @returns {string}
- */
-export function slugify(text) {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 /**

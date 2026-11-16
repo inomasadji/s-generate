@@ -23,5 +23,7 @@ test('разные сиды дают разные названия', () => {
 
 test('slugify убирает всё лишнее', () => {
   assert.equal(slugify('Otinium Caseubbacula'), 'otinium-caseubbacula');
-  assert.equal(slugify('  --Ужас--  '), '');
+  assert.equal(slugify('  --Ужас--  '), 'uzhas');
+  assert.equal(slugify('Тихая Гряда'), 'tikhaya-gryada');
+  assert.equal(slugify('Càrn Dubh'), 'carn-dubh');
 });

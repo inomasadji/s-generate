@@ -47,13 +47,13 @@ export function buildLandscape(options = {}) {
   }
 
   // Дальний лес: мелкий, редкий, грубая детализация.
-  const farTrees = int(rng, 3, 5);
+  const farTrees = int(rng, 5, 7);
   for (let i = 0; i < farTrees; i++) {
     objects.push({
       model: buildTree({
         seed: `${seed}:far-${i}`,
         palette,
-        params: { depth: 1, density: 0.65, height: range(rng, 1.1, 1.5) },
+        params: { depth: 1, density: 0.7, height: range(rng, 1.1, 1.5) },
       }),
       x: freeX(70, 650, 110),
       y: range(rng, 505, 545),
@@ -62,13 +62,13 @@ export function buildLandscape(options = {}) {
   }
 
   // Средний план.
-  const midTrees = int(rng, 2, 3);
+  const midTrees = 4;
   for (let i = 0; i < midTrees; i++) {
     objects.push({
       model: buildTree({
         seed: `${seed}:mid-${i}`,
         palette,
-        params: { depth: 2, density: range(rng, 0.7, 0.95) },
+        params: { depth: 2, density: range(rng, 0.8, 1) },
       }),
       x: freeX(80, 640, 150),
       y: range(rng, 565, 605),
@@ -77,7 +77,7 @@ export function buildLandscape(options = {}) {
   }
 
   // Кустарники у земли: слева и справа, чтобы не спорить с героем.
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     objects.push({
       model: buildShrub({ seed: `${seed}:shrub-${i}`, palette }),
       x: i === 0 ? range(rng, 90, 170) : range(rng, 590, 670),
@@ -93,7 +93,7 @@ export function buildLandscape(options = {}) {
       model: buildMushroom({
         seed: `${seed}:mushroom-${i}`,
         palette,
-        params: { detail: 0.65 },
+        params: { detail: 0.8 },
       }),
       x: i === 0 ? range(rng, 170, 290) : range(rng, 480, 610),
       y: range(rng, 645, 690),
@@ -105,7 +105,7 @@ export function buildLandscape(options = {}) {
     model: buildMushroom({
       seed: `${seed}:hero`,
       palette,
-      params: { detail: 0.75 },
+      params: { detail: 0.9 },
     }),
     x: range(rng, 340, 400),
     y: 705,

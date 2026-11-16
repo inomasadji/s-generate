@@ -93,7 +93,12 @@ export function buildPlateDisplayList(scene, view, t) {
   }
 
   const centerX = area.x + area.width / 2;
-  const centerY = area.y + area.height / 2;
+  let centerY = area.y + area.height / 2;
+
+  if (projected.length > 0 && scene.align === 'bottom') {
+    const spanY = Math.max(1e-6, maxY - minY);
+    centerY = area.y + area.height - (spanY * scale) / 2;
+  }
 
   const items = projected.map((item) => ({
     pts: item.pts.map((point) => [
@@ -113,6 +118,9 @@ export function buildPlateDisplayList(scene, view, t) {
     width: LOGICAL_SIZE,
     height: LOGICAL_SIZE,
     backdrop: css(scene.palette.paper),
+    plateBackground: scene.background
+      ? { top: css(scene.background.top), bottom: css(scene.background.bottom) }
+      : null,
     ink: css(scene.palette.ink),
     items,
     overlay: scene.mode === 'plate' ? buildPlateOverlay(scene) : null,
