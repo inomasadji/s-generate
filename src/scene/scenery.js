@@ -183,14 +183,17 @@ export function buildMountains(seed, palette) {
       }
 
       if (y >= plan.snowLine) continue;
-      const width = (plan.snowLine - y) * 0.7;
+      const width = (plan.snowLine - y) * 0.8;
+      const tongue = (plan.snowLine - y) * 0.45;
       items.push({
         pts: [
           [x, y],
           [x + width, plan.snowLine],
-          [x + width * 0.45, plan.snowLine - 7],
-          [x - width * 0.35, plan.snowLine],
-          [x - width * 0.8, plan.snowLine - 4],
+          [x + width * 0.4, plan.snowLine + tongue * 0.5],
+          [x + width * 0.2, plan.snowLine - 3],
+          [x - width * 0.05, plan.snowLine + tongue],
+          [x - width * 0.25, plan.snowLine - 2],
+          [x - width * 0.9, plan.snowLine],
         ],
         color: palette.snow,
         layer: 1,

@@ -104,14 +104,17 @@ export function buildMountain(options = {}) {
 
   for (const [x, y] of front.tops) {
     if (y <= snowLine) continue;
-    const width = (y - snowLine) * 0.95 + 0.05;
+    const width = (y - snowLine) * 1.05 + 0.06;
+    const tongue = (y - snowLine) * 0.55;
     push(
       [
         [x, y],
         [x + width, snowLine],
-        [x + width * 0.45, snowLine - 0.035],
-        [x - width * 0.3, snowLine],
-        [x - width * 0.85, snowLine - 0.02],
+        [x + width * 0.4, snowLine + tongue * 0.5],
+        [x + width * 0.2, snowLine - 0.02],
+        [x - width * 0.05, snowLine + tongue],
+        [x - width * 0.25, snowLine - 0.03],
+        [x - width * 0.9, snowLine],
       ],
       palette.snow,
       'snow',
