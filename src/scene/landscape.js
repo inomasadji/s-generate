@@ -4,7 +4,7 @@ import { int, range, rngStream } from '../core/rng.js';
 import { buildMushroom } from '../model/mushroom.js';
 import { generateName } from '../model/naming/naming.js';
 import { buildShrub, buildTree } from '../model/tree.js';
-import { buildClouds, buildGrass, buildHills, buildMountains, buildSky, buildSun, ellipsePolygon } from './scenery.js';
+import { buildClouds, buildGrass, buildHills, buildMist, buildMountains, buildSky, buildSun, ellipsePolygon } from './scenery.js';
 
 /**
  * Ландшафт: небо, рельеф и расставленные объекты. Всё в логических
@@ -22,6 +22,7 @@ export function buildLandscape(options = {}) {
     ...buildClouds(seed, palette),
     ...buildMountains(seed, palette),
     ...buildHills(seed, palette),
+    ...buildMist(seed, palette),
     ...buildGrass(seed, palette),
   ];
 

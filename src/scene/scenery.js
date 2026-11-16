@@ -167,7 +167,7 @@ export function buildMountains(seed, palette) {
 
     for (const [x, y] of tops) {
       // Отвесные скалы: тёмные полосы от вершины к подножию.
-      for (let cliff = 0; cliff < 2; cliff++) {
+      for (let cliff = 0; cliff < 1; cliff++) {
         const cx = x + range(rng, -20, 20);
         const topY = y + (plan.baseY - y) * range(rng, 0.15, 0.4);
         items.push({
@@ -177,7 +177,7 @@ export function buildMountains(seed, palette) {
             [cx + 8, plan.baseY],
             [cx - 2, plan.baseY],
           ],
-          color: mixColor(palette.mountainShade, palette.ink, 0.22),
+          color: mixColor(palette.mountainShade, palette.ink, 0.12),
           layer: 1,
         });
       }
@@ -199,6 +199,32 @@ export function buildMountains(seed, palette) {
         layer: 1,
       });
     }
+  }
+
+  return items;
+}
+
+/**
+ * Дымка у подножия: несколько полупрозрачных полос между холмами и травой.
+ *
+ * @param {string} seed
+ * @param {import('../core/palette.js').Palette} palette
+ * @returns {SceneryItem[]}
+ */
+export function buildMist(seed, palette) {
+  const rng = rngStream(seed, 'mist');
+  const items = [];
+
+  for (let i = 0; i < 2; i++) {
+    const y = range(rng, 360, 462);
+    const height = range(rng, 8, 18);
+
+    items.push({
+      pts: [[-20, y], [740, y + range(rng, -6, 6)], [740, y + height], [-20, y + height]],
+      color: mixColor(palette.cloud, palette.skyBottom, 0.35),
+      alpha: range(rng, 0.08, 0.16),
+      layer: 3.5,
+    });
   }
 
   return items;

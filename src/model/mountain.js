@@ -21,7 +21,7 @@ export function buildMountain(options = {}) {
    * @param {string} group
    * @param {boolean} [outline]
    */
-  function push(points, color, group, outline = true) {
+  function push(points, color, group, outline = true, alpha = 1) {
     polys.push({
       pts: points.map(([x, y]) => [x, y, 0]),
       color,
@@ -29,6 +29,7 @@ export function buildMountain(options = {}) {
       group,
       layer: 0,
       outline,
+      alpha,
     });
   }
 
@@ -82,8 +83,8 @@ export function buildMountain(options = {}) {
     );
 
     // Отвесные скалы: узкие тёмные полосы в теле горы.
-    for (let cliff = 0; cliff < 2; cliff++) {
-      const cx = x + range(rng, -0.16, 0.16);
+    for (let cliff = 0; cliff < 1; cliff++) {
+      const cx = x + range(rng, -0.12, 0.12);
       const top = y * range(rng, 0.5, 0.82);
       push(
         [
@@ -92,7 +93,7 @@ export function buildMountain(options = {}) {
           [cx + 0.036, 0],
           [cx - 0.006, 0],
         ],
-        mixColor(palette.mountainShade, palette.ink, 0.28),
+        mixColor(palette.mountainShade, palette.ink, 0.14),
         'cliff',
         false,
       );
@@ -105,16 +106,15 @@ export function buildMountain(options = {}) {
   for (const [x, y] of front.tops) {
     if (y <= snowLine) continue;
     const width = (y - snowLine) * 1.05 + 0.06;
-    const tongue = (y - snowLine) * 0.55;
+    const tongue = (y - snowLine) * 0.5;
     push(
       [
         [x, y],
         [x + width, snowLine],
-        [x + width * 0.4, snowLine + tongue * 0.5],
-        [x + width * 0.2, snowLine - 0.02],
-        [x - width * 0.05, snowLine + tongue],
-        [x - width * 0.25, snowLine - 0.03],
-        [x - width * 0.9, snowLine],
+        [x + width * 0.35, snowLine + tongue * 0.45],
+        [x - width * 0.1, snowLine + tongue],
+        [x - width * 0.45, snowLine + tongue * 0.35],
+        [x - width, snowLine],
       ],
       palette.snow,
       'snow',
@@ -128,6 +128,22 @@ export function buildMountain(options = {}) {
     mixColor(palette.mountainShade, palette.ground, 0.4),
     'scree',
     false,
+  );
+
+  // Дымка у подножия: гора уходит в холодную мглу, а не стоит на линейке.
+  push(
+    [[-1.05, 0.02], [1.05, 0.01], [1.05, 0.2], [-1.05, 0.23]],
+    mixColor(palette.skyBottom, palette.snow, 0.3),
+    'mist',
+    false,
+    0.16,
+  );
+  push(
+    [[-1.05, 0.16], [1.05, 0.14], [1.05, 0.3], [-1.05, 0.33]],
+    mixColor(palette.skyBottom, palette.snow, 0.2),
+    'mist',
+    false,
+    0.1,
   );
 
   const bounds = { min: [-1.05, 0, 0], max: [1.05, 1, 0] };
