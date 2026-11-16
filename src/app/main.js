@@ -1,32 +1,60 @@
-import { getPalette } from '../core/palette.js';
+import { css, getPalette } from '../core/palette.js';
+import { downloadBlob, plateFileName, renderPng } from '../export/png.js';
 import { buildDisplayList } from '../render/build.js';
 import { layout } from '../render/layout.js';
 import { paint } from '../render/paint.js';
+import { buildPlate } from '../scene/plate.js';
 
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
+const saveButton = document.querySelector('#save');
 
 const params = new URLSearchParams(location.search);
-const scene = {
-  seed: params.get('seed') || 'demo',
-  palette: getPalette(params.get('palette') || 'paper'),
-};
+const seed = params.get('seed') || 'demo';
+const palette = getPalette(params.get('palette') || 'paper');
+const scene = buildPlate({ seed, palette });
+
+document.documentElement.style.setProperty('--ink', css(palette.ink));
+document.documentElement.style.setProperty('--accent', css(palette.accent));
+document.documentElement.style.setProperty('--paper', css(palette.paper));
+document.title = `${scene.name.full} — s-generate`;
 
 function render() {
+  const rect = canvas.getBoundingClientRect();
   const view = layout({
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: rect.width,
+    height: rect.height,
     dpr: window.devicePixelRatio || 1,
   });
 
   canvas.width = view.pixelWidth;
   canvas.height = view.pixelHeight;
-  canvas.style.width = `${view.cssWidth}px`;
-  canvas.style.height = `${view.cssHeight}px`;
 
-  const displayList = buildDisplayList(scene, view, 0);
-  paint(ctx, displayList, view);
+  paint(ctx, buildDisplayList(scene, view), view);
 }
+
+saveButton.addEventListener('click', async () => {
+  const label = saveButton.textContent;
+
+  saveButton.disabled = true;
+  saveButton.textContent = 'Собираю…';
+
+  try {
+    const blob = await renderPng(scene, 1080);
+    downloadBlob(blob, plateFileName(scene));
+  } catch (error) {
+    console.error(error);
+    saveButton.textContent = 'Не вышло, ещё раз?';
+    setTimeout(() => {
+      saveButton.textContent = label;
+      saveButton.disabled = false;
+    }, 2000);
+    return;
+  }
+
+  saveButton.textContent = label;
+  saveButton.disabled = false;
+});
 
 window.addEventListener('resize', render);
 render();

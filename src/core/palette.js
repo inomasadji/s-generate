@@ -15,6 +15,10 @@ export const PALETTES = Object.freeze({
     muted: Object.freeze([140, 128, 112]),
     ink: Object.freeze([38, 34, 32]),
     accent: Object.freeze([168, 84, 60]),
+    stem: Object.freeze([222, 208, 184]),
+    cap: Object.freeze([178, 92, 64]),
+    capShade: Object.freeze([138, 64, 46]),
+    spot: Object.freeze([246, 240, 226]),
   }),
 });
 

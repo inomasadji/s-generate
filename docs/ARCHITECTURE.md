@@ -38,11 +38,10 @@ seed ──► spec ──► model ──► scene ──► display list ─�
 холста, а плашка и сцена используют один код.
 
 ```js
-// core/camera.js — эскиз
-export function project(point, view) {
-  // 1. перенос в систему камеры
-  // 2. rotateY(yaw), rotateX(pitch)
-  // 3. экран: sx = cx + v.x * scale, sy = cy - v.y * scale, depth = v.z
+// render/camera.js
+export function projectPoint(point, camera) {
+  // 1. rotateY(yaw), rotateX(pitch)
+  // 2. экран: sx = cx + v.x * scale, sy = cy - v.y * scale, depth = v.z
 }
 ```
 
@@ -55,7 +54,8 @@ export function project(point, view) {
 /**
  * @typedef {[number, number, number]} Vec3
  * @typedef {{ pts: Vec3[], color: [number, number, number],
- *             normal?: Vec3, group?: string }} Poly
+ *             normal?: Vec3, group?: string, layer?: number,
+ *             bias?: number }} Poly
  * @typedef {{ kind: string, seed: string, polys: Poly[],
  *             bounds: { min: Vec3, max: Vec3 } }} Model
  */
@@ -63,6 +63,8 @@ export function project(point, view) {
 
 * `polys` — уже в локальных координатах объекта, порядок детерминирован.
 * `group` — для отладки и адресных правок («pileus», «spots»).
+* `layer` — очередь рисования внутри объекта: ножка `0`, шляпка `1`, пятна `2`.
+  Это не физика, а договорённость: пятна всегда лежат на шляпке.
 * `normal` считается один раз при сборке; нужен для света и контура.
 * Библиотека не «склеивает» геометрии: merge — это `polys.push(...other.polys)`.
 
@@ -105,14 +107,17 @@ export function project(point, view) {
 
 1. **Фон** — небо и градиенты (единственное место, где разрешены градиенты).
 2. **Дальние слои** — горы, облака; цвет смешан с цветом неба на `haze`.
-3. **Объекты** — от дальних к ближним, каждый полигон: заливка + обводка тем же
-   цветом `lineWidth 1` (закрывает щели между треугольниками).
+3. **Объекты** — слоями: ножка → шляпка → пятна. Внутри слоя полигоны идут от
+   дальних к ближним.
 4. **Контур** — рёбра силуэта: ребро, встречающееся один раз, — граница. Рисуется
-   поверх объекта цветом `ink`.
+   **до** заливки слоя и вдвое толще: заливка закрывает внутренние рёбра, снаружи
+   остаётся половина линии. Иначе скрытые рёбра (дальний край шляпки) просвечивают
+   сквозь объект.
 5. **Атмосфера** — общая дымка, виньетка.
 6. **Зерно** — тайл 256×256 из `ImageData`, `globalCompositeOperation = 'overlay'`,
    `alpha 0.05–0.12`. Тайл генерируется один раз из RNG с фиксированным сидом.
-7. **Рамка и подпись** — только в `plate`.
+7. **Рамка и подпись** — только в `plate`; приходят из display list как `overlay`,
+   чтобы не сортироваться вместе с полигонами.
 
 ## Свет и цвет
 
