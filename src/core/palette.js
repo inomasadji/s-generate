@@ -6,19 +6,151 @@
  * @typedef {Record<string, Rgb>} Palette
  */
 
+/**
+ * @param {Record<string, [number, number, number]>} tones
+ * @returns {Palette}
+ */
+function theme(tones) {
+  const frozen = {};
+  for (const [name, rgb] of Object.entries(tones)) frozen[name] = Object.freeze(rgb);
+  return Object.freeze(frozen);
+}
+
 /** @type {Record<string, Palette>} */
 export const PALETTES = Object.freeze({
   // Ботаническая иллюстрация: тёплая бумага, сепия, чернила.
-  paper: Object.freeze({
-    paper: Object.freeze([232, 224, 208]),
-    shade: Object.freeze([206, 196, 178]),
-    muted: Object.freeze([140, 128, 112]),
-    ink: Object.freeze([38, 34, 32]),
-    accent: Object.freeze([168, 84, 60]),
-    stem: Object.freeze([222, 208, 184]),
-    cap: Object.freeze([178, 92, 64]),
-    capShade: Object.freeze([138, 64, 46]),
-    spot: Object.freeze([246, 240, 226]),
+  paper: theme({
+    paper: [232, 224, 208],
+    shade: [206, 196, 178],
+    muted: [140, 128, 112],
+    ink: [38, 34, 32],
+    accent: [168, 84, 60],
+    stem: [222, 208, 184],
+    cap: [178, 92, 64],
+    capShade: [138, 64, 46],
+    spot: [246, 240, 226],
+    skyTop: [206, 214, 212],
+    skyBottom: [236, 229, 214],
+    sun: [232, 206, 150],
+    cloud: [242, 236, 224],
+    mountain: [178, 180, 172],
+    mountainShade: [150, 152, 146],
+    snow: [248, 244, 236],
+    hillFar: [176, 182, 164],
+    hillNear: [150, 162, 136],
+    ground: [186, 174, 150],
+    wood: [132, 110, 84],
+    leaf: [124, 140, 96],
+    leafDark: [96, 110, 74],
+    grass: [120, 132, 90],
+  }),
+
+  // Летний лес: зелень, кора, мох.
+  forest: theme({
+    paper: [232, 236, 222],
+    shade: [204, 212, 190],
+    muted: [118, 128, 104],
+    ink: [30, 38, 28],
+    accent: [176, 92, 54],
+    stem: [226, 216, 190],
+    cap: [150, 74, 52],
+    capShade: [112, 52, 38],
+    spot: [244, 238, 222],
+    skyTop: [164, 196, 208],
+    skyBottom: [226, 232, 214],
+    sun: [240, 214, 150],
+    cloud: [246, 244, 234],
+    mountain: [140, 156, 148],
+    mountainShade: [112, 128, 122],
+    snow: [246, 248, 244],
+    hillFar: [150, 172, 140],
+    hillNear: [110, 140, 96],
+    ground: [124, 140, 96],
+    wood: [104, 84, 62],
+    leaf: [86, 124, 74],
+    leafDark: [62, 96, 58],
+    grass: [92, 124, 70],
+  }),
+
+  // Сумерки: синие, розовые, фиолетовые.
+  dusk: theme({
+    paper: [230, 216, 206],
+    shade: [198, 182, 176],
+    muted: [120, 104, 112],
+    ink: [32, 26, 36],
+    accent: [206, 110, 86],
+    stem: [226, 206, 196],
+    cap: [126, 66, 96],
+    capShade: [92, 46, 72],
+    spot: [244, 226, 222],
+    skyTop: [92, 96, 140],
+    skyBottom: [226, 164, 142],
+    sun: [244, 196, 150],
+    cloud: [230, 184, 180],
+    mountain: [96, 92, 132],
+    mountainShade: [72, 70, 104],
+    snow: [236, 226, 232],
+    hillFar: [110, 100, 130],
+    hillNear: [82, 76, 104],
+    ground: [92, 82, 98],
+    wood: [78, 62, 70],
+    leaf: [96, 96, 120],
+    leafDark: [70, 70, 94],
+    grass: [86, 86, 104],
+  }),
+
+  // Осень: охра, ржавчина, бордо.
+  autumn: theme({
+    paper: [236, 226, 204],
+    shade: [208, 192, 164],
+    muted: [130, 112, 88],
+    ink: [40, 32, 24],
+    accent: [190, 96, 48],
+    stem: [226, 212, 182],
+    cap: [186, 96, 52],
+    capShade: [142, 66, 40],
+    spot: [246, 236, 218],
+    skyTop: [196, 198, 190],
+    skyBottom: [238, 214, 176],
+    sun: [238, 190, 120],
+    cloud: [244, 232, 214],
+    mountain: [150, 138, 130],
+    mountainShade: [122, 110, 104],
+    snow: [246, 242, 234],
+    hillFar: [166, 150, 118],
+    hillNear: [134, 116, 88],
+    ground: [160, 132, 94],
+    wood: [96, 76, 54],
+    leaf: [186, 124, 60],
+    leafDark: [142, 92, 48],
+    grass: [146, 120, 74],
+  }),
+
+  // Горы: серо-синие, снег, хвоя.
+  alpine: theme({
+    paper: [232, 234, 232],
+    shade: [202, 206, 206],
+    muted: [116, 124, 128],
+    ink: [28, 34, 40],
+    accent: [176, 86, 66],
+    stem: [228, 222, 210],
+    cap: [120, 104, 96],
+    capShade: [92, 78, 72],
+    spot: [246, 246, 242],
+    skyTop: [150, 178, 200],
+    skyBottom: [224, 232, 236],
+    sun: [246, 238, 210],
+    cloud: [250, 250, 248],
+    mountain: [128, 136, 146],
+    mountainShade: [100, 108, 118],
+    snow: [250, 250, 250],
+    hillFar: [150, 160, 166],
+    hillNear: [116, 130, 138],
+    ground: [150, 158, 154],
+    wood: [92, 86, 80],
+    leaf: [74, 102, 92],
+    leafDark: [52, 78, 70],
+    grass: [104, 124, 110],
   }),
 });
 

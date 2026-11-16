@@ -64,5 +64,5 @@ test('golden: картинка плашки не меняется незамет
   const scene = buildPlate({ seed: 'golden-1', palette });
   const list = buildDisplayList(scene, view);
 
-  assert.equal(hashItems(list.items), 'cf4520cb');
+  assert.equal(hashItems(list.items), '02309db8');
 });

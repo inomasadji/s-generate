@@ -3,14 +3,25 @@ import assert from 'node:assert/strict';
 
 import { css, getPalette } from '../src/core/palette.js';
 
-test('во всех темах каждый тон — три канала 0..255', () => {
-  const palette = getPalette('paper');
+test('во всех темах одинаковый набор тонов', () => {
+  const names = Object.keys(getPalette('paper')).sort();
 
-  for (const [name, rgb] of Object.entries(palette)) {
-    assert.equal(rgb.length, 3, `${name}: должно быть три канала`);
-    for (const channel of rgb) {
-      assert.ok(Number.isInteger(channel), `${name}: канал не целый`);
-      assert.ok(channel >= 0 && channel <= 255, `${name}: канал вне диапазона`);
+  for (const themeName of ['paper', 'forest', 'dusk', 'autumn', 'alpine']) {
+    const palette = getPalette(themeName);
+    assert.deepEqual(Object.keys(palette).sort(), names, themeName);
+  }
+});
+
+test('во всех темах каждый тон — три канала 0..255', () => {
+  for (const themeName of ['paper', 'forest', 'dusk', 'autumn', 'alpine']) {
+    const palette = getPalette(themeName);
+
+    for (const [name, rgb] of Object.entries(palette)) {
+      assert.equal(rgb.length, 3, `${themeName}.${name}: должно быть три канала`);
+      for (const channel of rgb) {
+        assert.ok(Number.isInteger(channel), `${themeName}.${name}: канал не целый`);
+        assert.ok(channel >= 0 && channel <= 255, `${themeName}.${name}: канал вне диапазона`);
+      }
     }
   }
 });

@@ -6,14 +6,15 @@ import { generateName } from '../model/naming/naming.js';
  * Плашка — один объект на «бумаге» с рамкой и подписью.
  * Мир у плашки и сцены общий: отличается только композиция.
  *
- * @param {{ seed?: string, palette: import('../core/palette.js').Palette }} options
+ * @param {{ seed?: string, palette: import('../core/palette.js').Palette,
+ *           shape?: string }} options
  * @returns {{ mode: 'plate', kind: string, seed: string,
  *             palette: object, shape: object,
  *             name: { genus: string, species: string, full: string, slug: string },
  *             camera: { yaw: number, pitch: number } }}
  */
 export function buildPlate(options) {
-  const { seed = 'demo', palette } = options;
+  const { seed = 'demo', palette, shape } = options;
   const cameraRng = rngStream(seed, 'camera');
 
   return {
@@ -21,7 +22,7 @@ export function buildPlate(options) {
     kind: 'mushroom',
     seed,
     palette,
-    shape: buildMushroom({ seed, palette }),
+    shape: buildMushroom({ seed, palette, params: shape ? { shape } : {} }),
     name: generateName(seed),
     // Небольшой разброс ракурса: плашки не должны быть близнецами.
     camera: {

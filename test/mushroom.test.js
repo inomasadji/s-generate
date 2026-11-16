@@ -51,6 +51,19 @@ test('габариты охватывают все вершины', () => {
   assert.ok(max[1] - min[1] > 1);
 });
 
+test('у мухомора есть юбка', () => {
+  const mushroom = buildMushroom({
+    seed: 'ring-test',
+    params: { shape: 'amanita' },
+  });
+
+  assert.ok(mushroom.polys.some((poly) => poly.group === 'ring'));
+  assert.equal(
+    mushroom.polys.filter((poly) => poly.group === 'spot').length,
+    12,
+  );
+});
+
 test('параметры можно переопределить', () => {
   const mushroom = buildMushroom({
     seed: 'fixed',

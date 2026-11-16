@@ -2,7 +2,7 @@ import { mixColor, shadeColor } from '../core/color.js';
 import { add, clamp, cross, dot, length, normalize, scale, sub } from '../core/math.js';
 import { createNoise } from '../core/noise.js';
 import { getPalette } from '../core/palette.js';
-import { int, pick, range, rngStream } from '../core/rng.js';
+import { int, pick, range, rngStream, chance } from '../core/rng.js';
 import { sampleSpline, splinePoint, splineTangent } from '../core/spline.js';
 
 const VERTICAL = 14;
@@ -11,6 +11,17 @@ const PROFILE_STEPS = 8;
 const SEGMENTS = 40;
 
 const CAP_SHAPES = ['convex', 'flat', 'umbonate', 'funnel'];
+
+/**
+ * Крайние формы. Умножители применяются к базовым параметрам, поэтому сид
+ * всё равно влияет на всё остальное.
+ */
+const PRESETS = {
+  classic: {},
+  parasol: { height: 1.35, stemRadius: 0.65, capRadius: 1.15, capProfile: 'flat', spotCount: 0 },
+  porcini: { height: 0.78, stemRadius: 1.95, capRadius: 0.88, capProfile: 'convex', spotCount: 0 },
+  amanita: { capRadius: 1.05, spotCount: 12, ring: true, capProfile: 'convex' },
+};
 
 /**
  * Гриб: ножка-свип, шляпка-вращение с тремя слоями шума, пятна.
@@ -33,16 +44,29 @@ export function buildMushroom(options = {}) {
   const rng = rngStream(seed, 'mushroom');
   const noise = createNoise(rngStream(seed, 'noise'));
 
-  const height = Number(params.height ?? range(rng, 0.95, 1.45));
-  const stemRadius = Number(params.stemRadius ?? range(rng, 0.06, 0.11));
-  const capRadius = Number(params.capRadius ?? range(rng, 0.55, 0.95));
+  const preset = PRESETS[params.shape] ?? {};
+  const baseHeight = Number(params.height ?? range(rng, 0.95, 1.45));
+  const baseStemRadius = Number(params.stemRadius ?? range(rng, 0.06, 0.11));
+  const baseCapRadius = Number(params.capRadius ?? range(rng, 0.55, 0.95));
+
+  const height = baseHeight * (preset.height ?? 1);
+  const stemRadius = baseStemRadius * (preset.stemRadius ?? 1);
+  const capRadius = baseCapRadius * (preset.capRadius ?? 1);
   const lean = Number(params.lean ?? range(rng, -0.22, 0.2));
   const stemNoise = Number(params.stemNoise ?? range(rng, 0.05, 0.14));
-  const capProfile = String(params.capProfile ?? pick(rng, CAP_SHAPES));
+  const capProfile = String(params.capProfile ?? preset.capProfile ?? pick(rng, CAP_SHAPES));
   const radialNoise = Number(params.radialNoise ?? range(rng, 0.1, 0.24));
   const angularNoise = Number(params.angularNoise ?? range(rng, 0.02, 0.09));
   const orthNoise = Number(params.orthNoise ?? range(rng, 0.04, 0.12));
-  const spotCount = Number(params.spotCount ?? int(rng, 0, 12));
+  const spotCount = Number(params.spotCount ?? preset.spotCount ?? int(rng, 0, 12));
+  const hasRing = params.ring ?? preset.ring ?? chance(rng, 0.45);
+
+  // Детализация: сцена рисует мелкие грибы грубее, чем плашка крупным планом.
+  const detail = clamp(Number(params.detail ?? 1), 0.4, 1.5);
+  const verticalSegments = Math.max(8, Math.round(VERTICAL * detail));
+  const radialSegments = Math.max(10, Math.round(RADIAL * detail));
+  const profileSteps = Math.max(5, Math.round(PROFILE_STEPS * detail));
+  const capSegments = Math.max(16, Math.round(SEGMENTS * detail));
 
   const polys = [];
   const centerY = height * 0.55;
@@ -115,7 +139,7 @@ export function buildMushroom(options = {}) {
       return [Math.cos(angle) * radius, 0, Math.sin(angle) * radius];
     });
 
-    return sampleSpline(section, RADIAL, { closed: true, tension: 0.75 })
+    return sampleSpline(section, radialSegments, { closed: true, tension: 0.75 })
       .map((point) => [
         axisPoint[0] + point[0],
         axisPoint[1],
@@ -123,20 +147,52 @@ export function buildMushroom(options = {}) {
       ]);
   }
 
-  const rings = Array.from({ length: VERTICAL + 1 }, (_, index) => stipeRing(index / VERTICAL));
+  const rings = Array.from({ length: verticalSegments + 1 }, (_, index) => stipeRing(index / verticalSegments));
 
-  for (let i = 0; i < VERTICAL; i++) {
-    const t = i / VERTICAL;
+  for (let i = 0; i < verticalSegments; i++) {
+    const t = i / verticalSegments;
     const baseColor = mixColor(palette.stem, palette.shade, (1 - t) * 0.18);
 
-    for (let j = 0; j < RADIAL; j++) {
-      const next = (j + 1) % RADIAL;
+    for (let j = 0; j < radialSegments; j++) {
+      const next = (j + 1) % radialSegments;
       pushPoly(
         [rings[i][j], rings[i][next], rings[i + 1][next], rings[i + 1][j]],
         baseColor,
         'stipe',
         0,
       );
+    }
+  }
+
+  // --- Юбка (annulus) ----------------------------------------------------
+
+  if (hasRing) {
+    // Юбка ниже середины ножки: у шляпки широкий навес, и у самой шляпки
+    // кольцо просто прячется под ним.
+    const t = 0.5;
+    const axisPoint = splinePoint(axis, t);
+    const ringColor = mixColor(palette.spot, palette.shade, 0.25);
+    const inner = [];
+    const outer = [];
+
+    for (let j = 0; j < radialSegments; j++) {
+      const angle = (j / radialSegments) * Math.PI * 2;
+      const radius = stipeRadius(angle, t);
+      inner.push([
+        axisPoint[0] + Math.cos(angle) * radius * 1.04,
+        axisPoint[1] + 0.02,
+        axisPoint[2] + Math.sin(angle) * radius * 1.04,
+      ]);
+      outer.push([
+        axisPoint[0] + Math.cos(angle) * radius * 2.1,
+        axisPoint[1] - 0.07,
+        axisPoint[2] + Math.sin(angle) * radius * 2.1,
+      ]);
+    }
+
+    for (let j = 0; j < radialSegments; j++) {
+      const next = (j + 1) % radialSegments;
+      pushPoly([inner[j], outer[j], outer[next], inner[next]], ringColor, 'ring', 1);
     }
   }
 
@@ -188,28 +244,28 @@ export function buildMushroom(options = {}) {
   const center = capPoint(0, 0);
 
   const capRings = [];
-  for (let i = 1; i <= PROFILE_STEPS; i++) {
-    const ring = new Array(SEGMENTS);
-    for (let j = 0; j < SEGMENTS; j++) {
-      ring[j] = capPoint((j / SEGMENTS) * Math.PI * 2, i / PROFILE_STEPS);
+  for (let i = 1; i <= profileSteps; i++) {
+    const ring = new Array(capSegments);
+    for (let j = 0; j < capSegments; j++) {
+      ring[j] = capPoint((j / capSegments) * Math.PI * 2, i / profileSteps);
     }
     capRings.push(ring);
   }
 
-  for (let j = 0; j < SEGMENTS; j++) {
-    const next = (j + 1) % SEGMENTS;
-    pushPoly([center, capRings[0][j], capRings[0][next]], capColor(0.5 / PROFILE_STEPS), 'pileus', 1);
+  for (let j = 0; j < capSegments; j++) {
+    const next = (j + 1) % capSegments;
+    pushPoly([center, capRings[0][j], capRings[0][next]], capColor(0.5 / profileSteps), 'pileus', 2);
   }
 
-  for (let i = 0; i < PROFILE_STEPS - 1; i++) {
-    const t = (i + 1.5) / PROFILE_STEPS;
-    for (let j = 0; j < SEGMENTS; j++) {
-      const next = (j + 1) % SEGMENTS;
+  for (let i = 0; i < profileSteps - 1; i++) {
+    const t = (i + 1.5) / profileSteps;
+    for (let j = 0; j < capSegments; j++) {
+      const next = (j + 1) % capSegments;
       pushPoly(
         [capRings[i][j], capRings[i + 1][j], capRings[i + 1][next], capRings[i][next]],
         capColor(t),
         'pileus',
-        1,
+        2,
       );
     }
   }
@@ -243,7 +299,7 @@ export function buildMushroom(options = {}) {
       )));
     }
 
-    pushPoly(points, palette.spot, 'spot', 2);
+    pushPoly(points, palette.spot, 'spot', 3);
   }
 
   // --- Габариты ----------------------------------------------------------
