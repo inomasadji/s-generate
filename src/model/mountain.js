@@ -44,10 +44,19 @@ export function buildMountain(options = {}) {
     for (let i = 0; i < count; i++) {
       const x = -0.9 + ((i + 0.5) / count) * 1.8 + range(rng, -0.08, 0.08);
       const y = range(rng, minY, maxY);
+      const left = range(rng, 0.16, 0.32);
+      const right = range(rng, 0.1, 0.22);
+
       tops.push([x, y]);
-      points.push([x - range(rng, 0.18, 0.3), y * range(rng, 0.35, 0.55)]);
+      points.push([x - left, y * range(rng, 0.16, 0.38)]);
       points.push([x, y]);
-      points.push([x + range(rng, 0.16, 0.28), y * range(rng, 0.3, 0.5)]);
+      points.push([x + right, y * range(rng, 0.12, 0.3)]);
+
+      // Седловина к следующей вершине: хребет перестаёт быть пилой.
+      if (i < count - 1) {
+        const saddle = x + (1.8 / count) * range(rng, 0.35, 0.55);
+        points.push([saddle, range(rng, 0.12, 0.3)]);
+      }
     }
 
     points.push([1.05, 0]);
@@ -71,6 +80,23 @@ export function buildMountain(options = {}) {
       mixColor(palette.mountain, palette.mountainShade, 0.8),
       'mountain-shade',
     );
+
+    // Отвесные скалы: узкие тёмные полосы в теле горы.
+    for (let cliff = 0; cliff < 2; cliff++) {
+      const cx = x + range(rng, -0.16, 0.16);
+      const top = y * range(rng, 0.5, 0.82);
+      push(
+        [
+          [cx - 0.016, top],
+          [cx + 0.02, top * 0.96],
+          [cx + 0.036, 0],
+          [cx - 0.006, 0],
+        ],
+        mixColor(palette.mountainShade, palette.ink, 0.28),
+        'cliff',
+        false,
+      );
+    }
   }
 
   // Снег: только на вершинах выше линии.

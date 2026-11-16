@@ -143,10 +143,17 @@ export function buildMountains(seed, palette) {
     for (let i = 0; i < peaks; i++) {
       const x = -20 + ((i + 0.5) / peaks) * 760 + range(rng, -26, 26);
       const y = range(rng, plan.minY, plan.maxY);
+      const left = range(rng, 30, 52);
+      const right = range(rng, 22, 40);
+
       tops.push([x, y]);
-      ridge.push([x - range(rng, 34, 54), Math.min(plan.baseY, y + range(rng, 34, 64))]);
+      ridge.push([x - left, Math.min(plan.baseY, y + range(rng, 20, 42))]);
       ridge.push([x, y]);
-      ridge.push([x + range(rng, 34, 54), Math.min(plan.baseY, y + range(rng, 34, 64))]);
+      ridge.push([x + right, Math.min(plan.baseY, y + range(rng, 18, 38))]);
+
+      if (i < peaks - 1) {
+        ridge.push([x + (760 / peaks) * range(rng, 0.35, 0.55), Math.min(plan.baseY, y + range(rng, 55, 90))]);
+      }
     }
 
     ridge.push([760, plan.baseY]);
@@ -159,6 +166,22 @@ export function buildMountains(seed, palette) {
     if (plan.snowLine <= 0) continue;
 
     for (const [x, y] of tops) {
+      // Отвесные скалы: тёмные полосы от вершины к подножию.
+      for (let cliff = 0; cliff < 2; cliff++) {
+        const cx = x + range(rng, -20, 20);
+        const topY = y + (plan.baseY - y) * range(rng, 0.15, 0.4);
+        items.push({
+          pts: [
+            [cx - 4, topY],
+            [cx + 5, topY - 3],
+            [cx + 8, plan.baseY],
+            [cx - 2, plan.baseY],
+          ],
+          color: mixColor(palette.mountainShade, palette.ink, 0.22),
+          layer: 1,
+        });
+      }
+
       if (y >= plan.snowLine) continue;
       const width = (plan.snowLine - y) * 0.7;
       items.push({
