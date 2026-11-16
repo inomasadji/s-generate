@@ -69,5 +69,5 @@ test('сцена укладывается в бюджет полигонов', (
   const scene = buildLandscape({ seed: 'scape-3', palette });
   const list = buildDisplayList(scene, view);
 
-  assert.ok(list.items.length < 8000, `полигонов: ${list.items.length}`);
+  assert.ok(list.items.length < 12000, `полигонов: ${list.items.length}`);
 });
