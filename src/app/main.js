@@ -22,6 +22,9 @@ const scene = mode === 'scene'
   ? buildLandscape({ seed, palette })
   : buildSpecimen({ kind, seed, palette, shape: params.get('shape') || undefined });
 
+// Для скриншотов и встраивания: чистая картинка без панели.
+if (params.get('ui') === '0') document.querySelector('.toolbar').hidden = true;
+
 document.documentElement.style.setProperty('--ink', css(palette.ink));
 document.documentElement.style.setProperty('--accent', css(palette.accent));
 document.documentElement.style.setProperty('--paper', css(palette.paper));

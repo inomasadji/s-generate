@@ -48,9 +48,9 @@ export function buildCloud(options = {}) {
 
     // Одни и те же пуфы дают и тень, и тело: иначе тень «уезжает» в сторону.
     const puffs = Array.from({ length: blobs }, () => ({
-      x: cx + range(rng, -0.32, 0.32) * scale,
+      x: cx + range(rng, -0.22, 0.22) * scale,
       y: cy + range(rng, -0.02, 0.16) * scale,
-      radius: range(rng, 0.12, 0.24) * scale,
+      radius: range(rng, 0.14, 0.26) * scale,
     }));
 
     for (const item of puffs) {
@@ -62,8 +62,8 @@ export function buildCloud(options = {}) {
   }
 
   cloud(0, 0.08, 1, int(rng, 5, 7));
-  cloud(range(rng, -0.62, -0.5), -0.16, 0.5, 4);
-  cloud(range(rng, 0.5, 0.62), -0.2, 0.42, 4);
+  cloud(range(rng, -0.62, -0.5), -0.16, 0.5, 5);
+  cloud(range(rng, 0.5, 0.62), -0.2, 0.5, 5);
 
   const bounds = boundsOf(polys);
   return { kind: 'cloud', seed, polys, bounds };
