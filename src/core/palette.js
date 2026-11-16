@@ -155,6 +155,33 @@ export const PALETTES = Object.freeze({
 });
 
 /**
+ * Имя темы по объекту палитры: пригодится, когда решение зависит от темы,
+ * а не только от цветов (например, сезон дерева).
+ * @type {WeakMap<object, string>}
+ */
+const PALETTE_NAMES = new WeakMap();
+for (const [name, palette] of Object.entries(PALETTES)) PALETTE_NAMES.set(palette, name);
+
+const SEASON_BY_PALETTE = {
+  paper: 'summer',
+  forest: 'summer',
+  dusk: 'spring',
+  autumn: 'autumn',
+  alpine: 'winter',
+};
+
+/**
+ * Сезон выводится из палитры: осень даёт осенние деревья, alpine — зимние,
+ * dusk — весеннее цветение. Явный `season` в параметрах сильнее.
+ *
+ * @param {Palette} palette
+ * @returns {'spring' | 'summer' | 'autumn' | 'winter'}
+ */
+export function seasonOf(palette) {
+  return SEASON_BY_PALETTE[PALETTE_NAMES.get(palette) ?? 'paper'] ?? 'summer';
+}
+
+/**
  * Возвращает тему по имени. Неизвестное имя (например, из URL) не должно
  * ронять экран — падаем на `paper`.
  *

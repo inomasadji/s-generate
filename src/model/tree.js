@@ -1,6 +1,7 @@
 import { mixColor, shadeColor } from '../core/color.js';
 import { add, clamp, cross, dot, length, normalize, scale, sub } from '../core/math.js';
-import { getPalette } from '../core/palette.js';
+import { createNoise } from '../core/noise.js';
+import { getPalette, seasonOf } from '../core/palette.js';
 import { int, pick, range, rngStream } from '../core/rng.js';
 import { splinePoint } from '../core/spline.js';
 
@@ -35,15 +36,34 @@ export function buildTree(options = {}) {
   const foliageKind = String(params.foliage ?? pick(rng, ['round', 'round', 'column', 'conical']));
   const density = Number(params.density ?? range(rng, 0.75, 1));
   const detail = clamp(Number(params.detail ?? 1), 0.4, 1.2);
-  const clusterCount = Math.max(5, Math.round((params.clusters ?? 24) * detail * density));
+  const season = String(params.season ?? seasonOf(palette));
+  const habit = String(params.habit ?? 'upright');
+  const isWinter = season === 'winter';
+  const isSpring = season === 'spring';
+  const isAutumn = season === 'autumn';
+
+  const seasonClusterFactor = isWinter ? 0.2 : 1;
+  const clusterCount = Math.max(
+    3,
+    Math.round((params.clusters ?? 24) * detail * density * seasonClusterFactor),
+  );
   const leafDiscs = Math.max(2, Math.round(5 * detail));
+
+  const barkNoise = createNoise(rngStream(seed, 'bark'));
 
   const trunkSides = Math.max(5, Math.round(8 * detail));
   const branchSides = Math.max(4, Math.round(6 * detail));
 
-  const canopyShape = foliageKind === 'column'
-    ? { rx: 0.36, ry: 0.5, rz: 0.36, cy: 0.78 }
-    : { rx: 0.52, ry: 0.36, rz: 0.48, cy: 0.7 };
+  const habitShape = {
+    upright: { rx: 0.52, ry: 0.36, rz: 0.48, cy: 0.7 },
+    column: { rx: 0.36, ry: 0.5, rz: 0.36, cy: 0.78 },
+    weeping: { rx: 0.44, ry: 0.5, rz: 0.42, cy: 0.62 },
+    crooked: { rx: 0.62, ry: 0.24, rz: 0.5, cy: 0.8 },
+  };
+
+  const canopyShape = habit === 'upright' && foliageKind === 'column'
+    ? habitShape.column
+    : habitShape[habit] ?? habitShape.upright;
 
   const canopy = {
     center: [0, height * canopyShape.cy, 0],
@@ -122,10 +142,16 @@ export function buildTree(options = {}) {
     });
 
     for (let i = 0; i < rings.length - 1; i++) {
-      // Чередование тонов коры: ствол перестаёт быть однотонной палкой.
-      const tone = i % 4 === 0 ? mixColor(color, barkTone, 0.55) : mixColor(color, barkLight, 0.12);
       for (let side = 0; side < sides; side++) {
         const next = (side + 1) % sides;
+        // Продольные волокна коры: тон грани зависит от угла и высоты.
+        const angle = (side / sides) * Math.PI * 2;
+        const grain = barkNoise.perlin2(
+          Math.cos(angle) * 1.6 + i * 0.37,
+          Math.sin(angle) * 1.6 + i * 0.11,
+        );
+        const tone = mixColor(color, grain >= 0 ? barkTone : barkLight, Math.abs(grain) * 0.24);
+
         pushPoly(
           [rings[i][side], rings[i][next], rings[i + 1][next], rings[i + 1][side]],
           tone,
@@ -151,15 +177,26 @@ export function buildTree(options = {}) {
     ]);
 
     const up = clamp(relative[1] / canopy.radii[1], -1, 1);
-    let tone = mixColor(palette.leaf, palette.leafDark, clamp(0.45 - up * 0.35 + range(rng, 0, 0.2), 0, 1));
-    if (rng() < 0.25) tone = mixColor(tone, palette.paper, range(rng, 0.06, 0.16));
+    let base = palette.leaf;
+    if (isSpring) base = mixColor(base, palette.spot, 0.3);
+    if (isAutumn) base = mixColor(base, palette.accent, 0.5);
+    if (isWinter) base = mixColor(palette.leafDark, palette.muted, 0.35);
+
+    let tone = mixColor(base, palette.leafDark, clamp(0.45 - up * 0.35 + range(rng, 0, 0.2), 0, 1));
+    if (!isWinter && rng() < 0.25) tone = mixColor(tone, palette.paper, range(rng, 0.06, 0.16));
 
     const phase = range(rng, 0, Math.PI);
-    const points = Array.from({ length: 9 }, (_, index) => {
-      const angle = phase + (index / 9) * Math.PI * 2;
+    const points = Array.from({ length: 12 }, (_, index) => {
+      const angle = phase + (index / 12) * Math.PI * 2;
+      // Неровный край: диск перестаёт быть правильным многоугольником.
+      const wobble = 0.72 + Math.abs(barkNoise.perlin2(
+        Math.cos(angle) * 1.2 + center[0] * 5,
+        Math.sin(angle) * 1.2 + center[2] * 5,
+      )) * 0.5;
+      const r = radius * wobble;
       return [
-        center[0] + Math.cos(angle) * radius,
-        center[1] + Math.sin(angle) * radius * 0.88,
+        center[0] + Math.cos(angle) * r,
+        center[1] + Math.sin(angle) * r * 0.88,
         center[2],
       ];
     });
@@ -172,6 +209,32 @@ export function buildTree(options = {}) {
       layer: FOLIAGE_LAYER,
       outline: false,
     });
+
+    // Отдельные листики по краю: фактура вместо ровного блина.
+    if (detail >= 0.85 && !isWinter) {
+      for (let i = 0; i < 2; i++) {
+        const angle = range(rng, 0, Math.PI * 2);
+        const distance = radius * range(rng, 0.55, 1);
+        const lx = center[0] + Math.cos(angle) * distance;
+        const ly = center[1] + Math.sin(angle) * distance * 0.8;
+        const size = radius * range(rng, 0.2, 0.34);
+        const leafTone = mixColor(tone, palette.paper, 0.12);
+
+        polys.push({
+          pts: [
+            [lx + size, ly, center[2]],
+            [lx, ly + size * 0.55, center[2]],
+            [lx - size * 0.9, ly + size * 0.1, center[2]],
+            [lx, ly - size * 0.45, center[2]],
+          ],
+          color: shadeColor(leafTone, normal),
+          normal,
+          group: 'foliage',
+          layer: FOLIAGE_LAYER,
+          outline: false,
+        });
+      }
+    }
   }
 
   /**
@@ -236,7 +299,8 @@ export function buildTree(options = {}) {
    */
   function addBranch(origin, direction, branchLength, radius, remaining) {
     const mid = add(origin, scale(direction, branchLength * 0.5));
-    const lifted = normalize(add(direction, [range(rng, -0.1, 0.1), range(rng, 0.35, 0.6), range(rng, -0.1, 0.1)]));
+    const liftY = habit === 'weeping' ? range(rng, -0.55, -0.25) : range(rng, 0.35, 0.6);
+    const lifted = normalize(add(direction, [range(rng, -0.1, 0.1), liftY, range(rng, -0.1, 0.1)]));
     const tip = add(mid, scale(lifted, branchLength * 0.55));
 
     addTube(
@@ -247,11 +311,17 @@ export function buildTree(options = {}) {
     );
 
     if (remaining <= 0) {
-      addFoliageCluster(tip, height * range(rng, 0.1, 0.14), Math.max(2, leafDiscs - 1));
+      if (isWinter) {
+        addSnowTip(tip, height * range(rng, 0.016, 0.028));
+      } else {
+        addFoliageCluster(tip, height * range(rng, 0.1, 0.14), Math.max(2, leafDiscs - 1));
+      }
       return;
     }
 
-    addFoliageCluster(add(tip, [0, height * 0.02, 0]), height * 0.09, 2);
+    if (!isWinter) {
+      addFoliageCluster(add(tip, [0, height * 0.02, 0]), height * 0.09, 2);
+    }
 
     const baseAzimuth = Math.atan2(lifted[2], lifted[0]);
     const children = rng() < 0.3 ? 3 : 2;
@@ -293,21 +363,160 @@ export function buildTree(options = {}) {
     void axis;
   }
 
+  /**
+   * Снежная шапка на ветке.
+   * @param {number[]} center
+   * @param {number} size
+   */
+  function addSnowTip(center, size) {
+    polys.push({
+      pts: [
+        [center[0] + size, center[1], center[2]],
+        [center[0], center[1] + size * 0.55, center[2]],
+        [center[0] - size, center[1], center[2]],
+        [center[0], center[1] - size * 0.3, center[2]],
+      ],
+      color: palette.snow,
+      normal: [0, 1, 0],
+      group: 'snow',
+      layer: FOLIAGE_LAYER,
+      outline: false,
+    });
+  }
+
+  /**
+   * Каменная гряда у корней — для кривой сосны на скале.
+   */
+  function addRock() {
+    const rockColor = mixColor(palette.mountainShade, palette.ink, 0.15);
+
+    for (let i = 0; i < 2; i++) {
+      const width = trunkRadius * range(rng, 2.4, 3.6);
+      const heightRock = trunkRadius * range(rng, 3, 4.5);
+      const offset = range(rng, -trunkRadius * 3, trunkRadius * 3);
+
+      polys.push({
+        pts: [
+          [-width + offset, heightRock * 0.2],
+          [-width * 0.6 + offset, heightRock],
+          [width * 0.1 + offset, heightRock * 1.05],
+          [width + offset, heightRock * 0.55],
+          [width * 0.7 + offset, -trunkRadius * 0.2],
+          [-width * 0.8 + offset, -trunkRadius * 0.2],
+        ].map(([x, y]) => [x, y, 0]),
+        color: mixColor(rockColor, palette.ink, i === 0 ? 0.15 : 0),
+        normal: [0, 0, 1],
+        group: 'rock',
+        layer: -1,
+        outline: false,
+      });
+    }
+  }
+
+  /**
+   * Весеннее цветение: мелкие белые точки по кроне.
+   * @param {number} count
+   */
+  function addBlossoms(count) {
+    const blossomTone = mixColor(palette.spot, palette.accent, 0.22);
+
+    for (let i = 0; i < count; i++) {
+      const theta = range(rng, 0, Math.PI * 2);
+      const phi = range(rng, 0, Math.PI * 0.8);
+      const radius = range(rng, 0.7, 1.05);
+      const center = [
+        canopy.center[0] + Math.cos(theta) * Math.sin(phi) * canopy.radii[0] * radius,
+        canopy.center[1] + Math.cos(phi) * canopy.radii[1] * radius,
+        canopy.center[2] + Math.sin(theta) * Math.sin(phi) * canopy.radii[2] * radius,
+      ];
+      const size = height * range(rng, 0.007, 0.012);
+
+      polys.push({
+        pts: Array.from({ length: 5 }, (_, k) => {
+          const angle = (k / 5) * Math.PI * 2;
+          return [
+            center[0] + Math.cos(angle) * size,
+            center[1] + Math.sin(angle) * size,
+            center[2],
+          ];
+        }),
+        color: blossomTone,
+        normal: [0, 1, 0],
+        group: 'blossom',
+        layer: 2,
+        outline: false,
+      });
+    }
+  }
+
+  /**
+   * Осенний листопад: несколько листьев ниже кроны.
+   * @param {number} count
+   */
+  function addFallingLeaves(count) {
+    for (let i = 0; i < count; i++) {
+      const x = range(rng, -canopy.radii[0], canopy.radii[0]) * 0.9;
+      const y = range(rng, height * 0.12, canopy.center[1] - canopy.radii[1] * 0.4);
+      const z = range(rng, -canopy.radii[2], canopy.radii[2]) * 0.5;
+      const size = height * range(rng, 0.008, 0.014);
+      const tone = mixColor(palette.accent, palette.leaf, range(rng, 0.1, 0.5));
+
+      polys.push({
+        pts: [
+          [x + size, y],
+          [x, y + size * 0.5],
+          [x - size * 0.8, y + size * 0.1],
+          [x, y - size * 0.4],
+        ].map(([px, py]) => [px, py, z]),
+        color: tone,
+        normal: [0, 0, 1],
+        group: 'leaf',
+        layer: 2,
+        outline: false,
+      });
+    }
+  }
+
+  /**
+   * Плакучие пряди: цепочки листвы, свисающие с кроны.
+   * @param {number} count
+   */
+  function addWeepingStrands(count) {
+    for (let i = 0; i < count; i++) {
+      const angle = range(rng, 0, Math.PI * 2);
+      const depth = range(rng, 0.35, 0.95);
+      const x = canopy.center[0] + Math.cos(angle) * canopy.radii[0] * depth;
+      const z = canopy.center[2] + Math.sin(angle) * canopy.radii[2] * depth;
+      let y = canopy.center[1] - canopy.radii[1] * range(rng, 0.2, 0.55);
+      const length = int(rng, 4, 7);
+
+      for (let k = 0; k < length; k++) {
+        const px = x + range(rng, -0.02, 0.02) * height;
+        const pz = z + range(rng, -0.015, 0.015) * height;
+        addLeafDisc([px, Math.max(height * 0.08, y), pz], height * range(rng, 0.024, 0.04));
+        y -= height * range(rng, 0.03, 0.055);
+      }
+    }
+  }
+
   // --- Стволы ------------------------------------------------------------
 
   for (let trunk = 0; trunk < trunks; trunk++) {
     const azimuth = (trunk / Math.max(1, trunks)) * Math.PI * 2 + range(rng, -0.4, 0.4);
-    const lean = trunks > 1 ? range(rng, 0.16, 0.34) : range(rng, 0.02, 0.1);
+    const crooked = habit === 'crooked';
+    const lean = trunks > 1
+      ? range(rng, 0.16, 0.34)
+      : crooked ? range(rng, 0.25, 0.45) : range(rng, 0.02, 0.1);
     const topRadius = trunkRadius * (trunks > 1 ? 0.55 : 0.3);
 
     const axis = [
       [0, 0, 0],
-      [Math.cos(azimuth) * lean * 0.25, height * 0.28, Math.sin(azimuth) * lean * 0.25],
-      [Math.cos(azimuth) * lean * 0.65, height * 0.58, Math.sin(azimuth) * lean * 0.65],
-      [Math.cos(azimuth) * lean, height, Math.sin(azimuth) * lean],
+      [Math.cos(azimuth) * lean * (crooked ? 0.5 : 0.25), height * 0.28, Math.sin(azimuth) * lean * 0.25],
+      [Math.cos(azimuth) * lean * (crooked ? 0.3 : 0.65), height * 0.58, Math.sin(azimuth) * lean * (crooked ? 0.75 : 0.65)],
+      [Math.cos(azimuth) * lean * (crooked ? 1.15 : 1), height, Math.sin(azimuth) * lean * (crooked ? 0.2 : 1)],
     ];
 
-    const samples = Math.max(6, Math.round(10 * detail));
+    const samples = Math.max(6, Math.round(16 * detail));
     const points = [];
     const radii = [];
 
@@ -322,6 +531,7 @@ export function buildTree(options = {}) {
 
     addTube(points, radii, palette.wood, trunkSides);
     addRoots(axis, trunkRadius);
+    if (crooked) addRock();
 
     const top = points[points.length - 1];
 
@@ -341,7 +551,8 @@ export function buildTree(options = {}) {
       const t = 0.45 + (i / Math.max(1, branchCount - 1)) * 0.38;
       const origin = splinePoint(axis, t);
       const branchAzimuth = azimuth + i * 2.399 + range(rng, -0.35, 0.35);
-      const tilt = range(rng, 0.62, foliageKind === 'column' ? 0.72 : spread);
+      const tiltMax = habit === 'column' ? 0.72 : habit === 'crooked' ? 1.15 : spread;
+      const tilt = range(rng, 0.62, tiltMax);
       const direction = normalize([
         Math.sin(tilt) * Math.cos(branchAzimuth),
         Math.cos(tilt),
@@ -383,6 +594,11 @@ export function buildTree(options = {}) {
     addCanopyShell(clusterCount);
   }
 
+  if (habit === 'weeping') addWeepingStrands(Math.round(16 * detail));
+
+  if (isSpring) addBlossoms(Math.round(clusterCount * 1.4));
+  if (isAutumn) addFallingLeaves(Math.round(8 * detail));
+
   // --- Габариты ----------------------------------------------------------
 
   const min = [Infinity, Infinity, Infinity];
@@ -397,7 +613,7 @@ export function buildTree(options = {}) {
     }
   }
 
-  return { kind: 'tree', seed, height, foliage: foliageKind, polys, bounds: { min, max } };
+  return { kind: 'tree', seed, height, foliage: foliageKind, season, habit, polys, bounds: { min, max } };
 }
 
 /**

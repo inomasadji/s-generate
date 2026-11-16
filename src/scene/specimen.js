@@ -28,7 +28,7 @@ const CAMERAS = {
  *
  * @param {{ kind?: string, seed?: string,
  *           palette?: import('../core/palette.js').Palette,
- *           shape?: string }} [options]
+ *           shape?: string, habit?: string }} [options]
  */
 export function buildSpecimen(options = {}) {
   const {
@@ -36,6 +36,7 @@ export function buildSpecimen(options = {}) {
     seed = 'demo',
     palette = getPalette('paper'),
     shape,
+    habit,
   } = options;
 
   const known = SPECIMEN_KINDS.includes(kind) ? kind : 'mushroom';
@@ -52,7 +53,7 @@ export function buildSpecimen(options = {}) {
 
   switch (known) {
     case 'tree':
-      model = buildTree({ seed, palette });
+      model = buildTree({ seed, palette, params: habit ? { habit } : {} });
       name = generateName(seed);
       break;
     case 'hill':

@@ -20,7 +20,13 @@ const kind = params.get('kind') || 'mushroom';
 
 const scene = mode === 'scene'
   ? buildLandscape({ seed, palette })
-  : buildSpecimen({ kind, seed, palette, shape: params.get('shape') || undefined });
+  : buildSpecimen({
+    kind,
+    seed,
+    palette,
+    shape: params.get('shape') || undefined,
+    habit: params.get('habit') || undefined,
+  });
 
 // Для скриншотов и встраивания: чистая картинка без панели.
 if (params.get('ui') === '0') document.querySelector('.toolbar').hidden = true;
