@@ -3,21 +3,34 @@ import { downloadBlob, plateFileName, renderPng } from '../export/png.js';
 import { buildDisplayList } from '../render/build.js';
 import { layout } from '../render/layout.js';
 import { paint } from '../render/paint.js';
+import { buildLandscape } from '../scene/landscape.js';
 import { buildPlate } from '../scene/plate.js';
 
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const saveButton = document.querySelector('#save');
+const modeButton = document.querySelector('#mode');
 
 const params = new URLSearchParams(location.search);
 const seed = params.get('seed') || 'demo';
 const palette = getPalette(params.get('palette') || 'paper');
-const scene = buildPlate({ seed, palette });
+const mode = params.get('mode') === 'scene' ? 'scene' : 'plate';
+
+const scene = mode === 'scene'
+  ? buildLandscape({ seed, palette })
+  : buildPlate({ seed, palette, shape: params.get('shape') || undefined });
 
 document.documentElement.style.setProperty('--ink', css(palette.ink));
 document.documentElement.style.setProperty('--accent', css(palette.accent));
 document.documentElement.style.setProperty('--paper', css(palette.paper));
 document.title = `${scene.name.full} — s-generate`;
+
+modeButton.textContent = mode === 'scene' ? 'Плашка' : 'Сцена';
+modeButton.addEventListener('click', () => {
+  const next = new URLSearchParams(location.search);
+  next.set('mode', mode === 'scene' ? 'plate' : 'scene');
+  location.search = next.toString();
+});
 
 function render() {
   const rect = canvas.getBoundingClientRect();

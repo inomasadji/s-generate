@@ -10,10 +10,15 @@ import { LOGICAL_SIZE } from './layout.js';
 export function paint(ctx, displayList, view) {
   const dpr = view.dpr;
 
-  // 1. Фон — на всю площадь окна, в CSS-пикселях.
+  // 1. Фон. У плашки это цвет бумаги, у сцены — небо и земля.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = displayList.backdrop;
-  ctx.fillRect(0, 0, view.cssWidth, view.cssHeight);
+  if (typeof displayList.backdrop === 'string') {
+    ctx.fillStyle = displayList.backdrop;
+    ctx.fillRect(0, 0, view.cssWidth, view.cssHeight);
+  } else {
+    ctx.fillStyle = displayList.backdrop.outer;
+    ctx.fillRect(0, 0, view.cssWidth, view.cssHeight);
+  }
 
   // 2. Сцена — квадрат по центру, дальше рисуем в логических единицах.
   ctx.setTransform(
@@ -26,6 +31,8 @@ export function paint(ctx, displayList, view) {
   ctx.beginPath();
   ctx.rect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
   ctx.clip();
+
+  if (typeof displayList.backdrop !== 'string') paintSky(ctx, displayList.backdrop);
 
   // 3. Слои: сначала все полигоны слоя, потом контур силуэта этого слоя.
   //    Так спрятанный контур (верх ножки под шляпкой) не просвечивает.
@@ -67,6 +74,28 @@ export function paint(ctx, displayList, view) {
   if (displayList.overlay) drawPlate(ctx, displayList.overlay);
 
   ctx.restore();
+}
+
+/**
+ * Небо и земля. Градиенты здесь — единственное исключение из правила
+ * «формы заливаются плоским цветом».
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ horizon: number, top: string, bottom: string,
+ *           groundTop: string, groundBottom: string }} sky
+ */
+function paintSky(ctx, sky) {
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, sky.horizon);
+  skyGradient.addColorStop(0, sky.top);
+  skyGradient.addColorStop(1, sky.bottom);
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, LOGICAL_SIZE, sky.horizon);
+
+  const groundGradient = ctx.createLinearGradient(0, sky.horizon, 0, LOGICAL_SIZE);
+  groundGradient.addColorStop(0, sky.groundTop);
+  groundGradient.addColorStop(1, sky.groundBottom);
+  ctx.fillStyle = groundGradient;
+  ctx.fillRect(0, sky.horizon, LOGICAL_SIZE, LOGICAL_SIZE - sky.horizon);
 }
 
 /**
@@ -130,6 +159,7 @@ function drawSilhouette(ctx, items, ink, lineWidth) {
   const keyOf = (point) => `${point[0].toFixed(2)},${point[1].toFixed(2)}`;
 
   for (const item of items) {
+    if (item.outline === false) continue;
     for (let i = 0; i < item.pts.length; i++) {
       const a = keyOf(item.pts[i]);
       const b = keyOf(item.pts[(i + 1) % item.pts.length]);

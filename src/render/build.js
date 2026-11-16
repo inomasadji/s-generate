@@ -9,30 +9,41 @@ import { PLATE_AREA, buildPlateOverlay } from './plate.js';
  * @typedef {object} Item
  * @property {[number, number][]} pts экранные точки, логические единицы
  * @property {string} color CSS-цвет
- * @property {number} layer порядок слоёв: ножка → шляпка → пятна
+ * @property {number} layer порядок слоёв
  * @property {number} z глубина для сортировки внутри слоя
+ * @property {boolean} [outline] рисовать ли контур силуэта
  * @property {number} index исходный порядок, чтобы сортировка была стабильной
  *
  * @typedef {object} DisplayList
  * @property {number} width
  * @property {number} height
- * @property {string} backdrop
+ * @property {string | object} backdrop
  * @property {string} ink
  * @property {Item[]} items
- * @property {object | null} overlay рамка и подпись
+ * @property {object | null} overlay
  */
 
 /**
- * @param {{ mode: 'plate' | 'scene', seed: string,
- *           palette: import('../core/palette.js').Palette,
- *           shape: { polys: Array<{ pts: number[][], color: number[],
- *             layer: number, bias?: number }> },
- *           camera?: { yaw: number, pitch: number } }} scene
+ * @param {object} scene
  * @param {import('./layout.js').View} view
  * @param {number} [t]
  * @returns {DisplayList}
  */
 export function buildDisplayList(scene, view, t = 0) {
+  return scene.mode === 'scene'
+    ? buildSceneDisplayList(scene)
+    : buildPlateDisplayList(scene, view, t);
+}
+
+/**
+ * Плашка: один объект, вписанный в область рисунка, плюс рамка и подпись.
+ *
+ * @param {object} scene
+ * @param {import('./layout.js').View} view
+ * @param {number} t
+ * @returns {DisplayList}
+ */
+export function buildPlateDisplayList(scene, view, t) {
   void view;
   void t;
 
@@ -62,13 +73,12 @@ export function buildDisplayList(scene, view, t = 0) {
       z: z / pts.length + (poly.bias ?? 0),
       color: poly.color,
       layer: poly.layer ?? 0,
+      outline: poly.outline !== false,
       index,
     });
   });
 
-  const area = scene.mode === 'plate'
-    ? PLATE_AREA
-    : { x: 0, y: 0, width: LOGICAL_SIZE, height: LOGICAL_SIZE };
+  const area = scene.mode === 'plate' ? PLATE_AREA : { x: 0, y: 0, width: LOGICAL_SIZE, height: LOGICAL_SIZE };
 
   let scale = 1;
   let midX = 0;
@@ -92,6 +102,7 @@ export function buildDisplayList(scene, view, t = 0) {
     ]),
     color: css(item.color),
     layer: item.layer,
+    outline: item.outline,
     z: item.z,
     index: item.index,
   }));
@@ -105,5 +116,71 @@ export function buildDisplayList(scene, view, t = 0) {
     ink: css(scene.palette.ink),
     items,
     overlay: scene.mode === 'plate' ? buildPlateOverlay(scene) : null,
+  };
+}
+
+/**
+ * Сцена: небо и земля — фоном, рельеф — готовыми экранными полигонами,
+ * деревья и грибы — моделями, спроецированными и поставленными на землю.
+ *
+ * @param {object} scene
+ * @returns {DisplayList}
+ */
+export function buildSceneDisplayList(scene) {
+  const camera = createCamera(scene.camera);
+  const items = [];
+  let index = 0;
+
+  for (const entry of scene.scenery) {
+    items.push({
+      pts: entry.pts,
+      color: css(entry.color, entry.alpha ?? 1),
+      layer: entry.layer,
+      outline: false,
+      z: entry.z ?? 0,
+      index: index++,
+    });
+  }
+
+  for (const object of scene.objects) {
+    for (const poly of object.model.polys) {
+      const projected = poly.pts.map((point) => projectPoint(point, camera));
+      let z = 0;
+
+      for (const point of projected) z += point[2];
+
+      items.push({
+        pts: projected.map((point) => [
+          object.x + point[0] * object.scale,
+          object.y - point[1] * object.scale,
+        ]),
+        color: css(poly.color),
+        layer: object.layer + (poly.layer ?? 0),
+        outline: poly.outline !== false,
+        z: z / projected.length + (poly.bias ?? 0),
+        index: index++,
+      });
+    }
+  }
+
+  items.sort((a, b) => a.layer - b.layer || a.z - b.z || a.index - b.index);
+
+  const sky = scene.sky;
+
+  return {
+    width: LOGICAL_SIZE,
+    height: LOGICAL_SIZE,
+    backdrop: {
+      kind: 'sky',
+      horizon: sky.horizon,
+      outer: css(scene.palette.paper),
+      top: css(sky.top),
+      bottom: css(sky.bottom),
+      groundTop: css(sky.groundTop),
+      groundBottom: css(sky.groundBottom),
+    },
+    ink: css(scene.palette.ink),
+    items,
+    overlay: null,
   };
 }
