@@ -1,0 +1,13 @@
+{
+  "name": "s-generate",
+  "private": true,
+  "type": "module",
+  "description": "Генератор процедурных грибов, деревьев и ландшафтов на Canvas 2D",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test"
+  }
+}
