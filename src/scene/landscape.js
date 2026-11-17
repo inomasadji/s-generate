@@ -54,7 +54,7 @@ export function buildLandscape(options = {}) {
       model: buildTree({
         seed: `${seed}:far-${i}`,
         palette,
-        params: { depth: 1, density: 0.7, detail: 0.75, clusters: 12, height: range(rng, 1.1, 1.5) },
+        params: { depth: 1, density: 0.7, detail: 0.75, clusters: 16, height: range(rng, 1.1, 1.5) },
       }),
       x: freeX(70, 650, 110),
       y: range(rng, 505, 545),
@@ -69,7 +69,7 @@ export function buildLandscape(options = {}) {
       model: buildTree({
         seed: `${seed}:mid-${i}`,
         palette,
-        params: { depth: 2, density: range(rng, 0.85, 1.05), detail: 0.9, clusters: 16 },
+        params: { depth: 2, density: range(rng, 0.85, 1.05), detail: 0.9, clusters: 24 },
       }),
       x: freeX(80, 640, 150),
       y: range(rng, 565, 605),

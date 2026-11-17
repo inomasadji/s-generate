@@ -11,6 +11,15 @@ const FOLIAGE_LAYER = 1;
 /** Характеры дерева; `upright` — обычный ствол без крайностей. */
 export const TREE_HABITS = Object.freeze(['upright', 'column', 'weeping', 'crooked']);
 
+/** Хвойные силуэты: ель узкая и поникшая, пихта широкая, сосна редкая. */
+export const TREE_CONIFERS = Object.freeze(['spruce', 'fir', 'pine']);
+
+const CONIFERS = {
+  spruce: { tiers: 12, radius: 0.33, taper: 0.95, bare: 0.22, droop: 0.05, spread: 0.75, drift: 0.05 },
+  fir: { tiers: 10, radius: 0.4, taper: 0.8, bare: 0.18, droop: 0.03, spread: 0.9, drift: 0.03 },
+  pine: { tiers: 7, radius: 0.28, taper: 0.55, bare: 0.42, droop: 0.01, spread: 0.55, drift: 0.1 },
+};
+
 /**
  * Дерево: ствол с корнями, ветки-трубы, крона из дисков.
  *
@@ -30,13 +39,18 @@ export function buildTree(options = {}) {
   } = options;
 
   const rng = rngStream(seed, 'tree');
+  // Листья — отдельный поток: добавление деталей не должно сдвигать ветки.
+  const leafRng = rngStream(seed, 'leaves');
 
   const height = Number(params.height ?? range(rng, 1.05, 1.55));
   const trunkRadius = Number(params.trunkRadius ?? range(rng, 0.05, 0.085));
   const trunks = Number(params.trunks ?? 1);
   const depth = Number(params.depth ?? 2);
   const spread = Number(params.spread ?? range(rng, 0.6, 0.95));
-  const foliageKind = String(params.foliage ?? pick(rng, ['round', 'round', 'column', 'conical']));
+  const conifer = TREE_CONIFERS.includes(String(params.conifer)) ? String(params.conifer) : null;
+  const foliageKind = conifer
+    ? 'conical'
+    : String(params.foliage ?? pick(rng, ['round', 'round', 'column', 'conical']));
   const density = Number(params.density ?? range(rng, 0.75, 1));
   const detail = clamp(Number(params.detail ?? 1), 0.4, 1.2);
   const season = String(params.season ?? seasonOf(palette));
@@ -48,7 +62,7 @@ export function buildTree(options = {}) {
   const seasonClusterFactor = isWinter ? 0.2 : 1;
   const clusterCount = Math.max(
     3,
-    Math.round((params.clusters ?? 24) * detail * density * seasonClusterFactor),
+    Math.round((params.clusters ?? 28) * detail * density * seasonClusterFactor),
   );
   const leafDiscs = Math.max(2, Math.round(5 * detail));
 
@@ -179,13 +193,94 @@ export function buildTree(options = {}) {
   }
 
   /**
+   * Лист: две половины вдоль жилки. Одна светлее, другая темнее — лист
+   * читается сложенным, а не плоским ромбом.
+   *
+   * @param {number[]} origin
+   * @param {number} angle
+   * @param {number} length
+   * @param {number} width
+   * @param {number[]} normal
+   * @param {number[]} tone
+   */
+  function addLeaf(origin, angle, length, width, normal, tone) {
+    const tip = [
+      origin[0] + Math.cos(angle) * length,
+      origin[1] + Math.sin(angle) * length,
+      origin[2],
+    ];
+    const left = [
+      origin[0] + Math.cos(angle + 1.9) * width,
+      origin[1] + Math.sin(angle + 1.9) * width * 0.8,
+      origin[2],
+    ];
+    const right = [
+      origin[0] + Math.cos(angle - 1.9) * width,
+      origin[1] + Math.sin(angle - 1.9) * width * 0.8,
+      origin[2],
+    ];
+    const dark = mixColor(tone, palette.leafDark, 0.22);
+
+    polys.push({
+      pts: [origin, left, tip],
+      color: shadeColor(tone, normal),
+      normal,
+      group: 'foliage',
+      layer: FOLIAGE_LAYER,
+      outline: false,
+    });
+    polys.push({
+      pts: [origin, tip, right],
+      color: shadeColor(dark, normal),
+      normal,
+      group: 'foliage',
+      layer: FOLIAGE_LAYER,
+      outline: false,
+    });
+  }
+
+  /**
+   * Узел листьев: 2–4 листа вокруг точки, каждый со своим поворотом.
+   * Заменяет два случайных ромбика по краю диска.
+   *
+   * @param {number[]} center
+   * @param {number} size
+   * @param {number[]} normal
+   * @param {number[]} tone
+   */
+  function addLeafNode(center, size, normal, tone) {
+    const leaves = 3 + int(leafRng, 0, 1);
+
+    for (let i = 0; i < leaves; i++) {
+      const angle = range(leafRng, 0, Math.PI * 2);
+      const distance = size * range(leafRng, 0.3, 0.55);
+      const origin = [
+        center[0] + Math.cos(angle) * distance,
+        center[1] + Math.sin(angle) * distance * 0.85,
+        center[2],
+      ];
+      const length = size * range(leafRng, 0.5, 0.75);
+
+      addLeaf(
+        origin,
+        angle + range(leafRng, -0.4, 0.4),
+        length,
+        length * range(leafRng, 0.4, 0.5),
+        normal,
+        tone,
+      );
+    }
+  }
+
+  /**
    * Диск листвы. Нормаль наклонена к центру кроны — верх и левый бок светлее,
    * низ и правый — темнее.
    *
    * @param {number[]} center
    * @param {number} radius
+   * @param {boolean} [withLeaves] листовые узлы: только для лиственных
    */
-  function addLeafDisc(center, radius) {
+  function addLeafDisc(center, radius, withLeaves = true) {
     const relative = sub(center, canopy.center);
     const normal = normalize([
       relative[0] / canopy.radii[0] * 0.6,
@@ -227,30 +322,10 @@ export function buildTree(options = {}) {
       outline: false,
     });
 
-    // Отдельные листики по краю: фактура вместо ровного блина.
-    if (detail >= 0.85 && !isWinter) {
-      for (let i = 0; i < 2; i++) {
-        const angle = range(rng, 0, Math.PI * 2);
-        const distance = radius * range(rng, 0.55, 1);
-        const lx = center[0] + Math.cos(angle) * distance;
-        const ly = center[1] + Math.sin(angle) * distance * 0.8;
-        const size = radius * range(rng, 0.2, 0.34);
-        const leafTone = mixColor(tone, palette.paper, 0.12);
-
-        polys.push({
-          pts: [
-            [lx + size, ly, center[2]],
-            [lx, ly + size * 0.55, center[2]],
-            [lx - size * 0.9, ly + size * 0.1, center[2]],
-            [lx, ly - size * 0.45, center[2]],
-          ],
-          color: shadeColor(leafTone, normal),
-          normal,
-          group: 'foliage',
-          layer: FOLIAGE_LAYER,
-          outline: false,
-        });
-      }
+    // Узлы листьев по краю: фактура вместо ровного блина. Хвое не нужны
+    // широкие листья — у неё своя форма ярусов.
+    if (withLeaves && detail >= 0.85 && !isWinter) {
+      addLeafNode(center, radius, normal, tone);
     }
   }
 
@@ -393,7 +468,7 @@ export function buildTree(options = {}) {
         [center[0] - size, center[1], center[2]],
         [center[0], center[1] - size * 0.3, center[2]],
       ],
-      color: palette.snow,
+      color: mixColor(palette.snow, palette.skyTop, 0.22),
       normal: [0, 1, 0],
       group: 'snow',
       layer: FOLIAGE_LAYER,
@@ -518,6 +593,9 @@ export function buildTree(options = {}) {
 
   // --- Стволы ------------------------------------------------------------
 
+  /** Ось ствола для хвойной кроны: ярусы должны сидеть на ней, а не на x=0. */
+  let coniferAxis = null;
+
   for (let trunk = 0; trunk < trunks; trunk++) {
     const azimuth = (trunk / Math.max(1, trunks)) * Math.PI * 2 + range(rng, -0.4, 0.4);
     const crooked = habit === 'crooked';
@@ -553,7 +631,7 @@ export function buildTree(options = {}) {
     const top = points[points.length - 1];
 
     if (foliageKind === 'conical') {
-      addFoliageCluster(top, height * 0.12, 3);
+      coniferAxis = points;
       continue;
     }
 
@@ -584,25 +662,64 @@ export function buildTree(options = {}) {
   // --- Хвойная крона -----------------------------------------------------
 
   if (foliageKind === 'conical') {
-    const tiers = Math.max(5, Math.round(8 * detail));
+    // Тип хвойного выбирается сидом: ель, пихта или сосна. У каждого свой
+    // профиль ярусов, поэтому «ёлки» перестают быть одной формой.
+    const type = conifer ?? pick(rng, ['spruce', 'spruce', 'fir', 'pine']);
+    const preset = CONIFERS[type];
+    const tiers = Math.max(4, Math.round(preset.tiers * detail));
+    const phase = range(rng, 0, Math.PI * 2);
+    const drift = range(rng, -1, 1) * preset.drift * height;
+    const axis = coniferAxis ?? [[0, 0, 0], [0, height, 0]];
+    const axisAt = (value) => axis[Math.round(value * (axis.length - 1))];
 
     for (let tier = 0; tier < tiers; tier++) {
-      const t = 0.3 + (tier / tiers) * 0.68;
-      const tierRadius = height * (0.38 - t * 0.3) * density;
-      const count = Math.max(5, Math.round(7 * detail));
+      const t = tiers > 1 ? tier / (tiers - 1) : 1;
+      const y = height * (preset.bare + (1 - preset.bare) * t);
+      const ringRadius = height * preset.radius * Math.pow(1 - t, preset.taper) * density;
+      const axisPoint = axisAt(preset.bare + (1 - preset.bare) * t);
+      const centerX = axisPoint[0] + Math.sin(t * 2.7 + phase) * drift;
+      const centerZ = axisPoint[2] + Math.cos(t * 2.1 + phase) * drift * 0.5;
 
-      for (let i = 0; i < count; i++) {
-        const angle = (i / count) * Math.PI * 2 + tier * 0.7;
-        const point = [
-          Math.cos(angle) * tierRadius * range(rng, 0.75, 1),
-          height * t + range(rng, -0.03, 0.03) * height,
-          Math.sin(angle) * tierRadius * range(rng, 0.75, 1),
-        ];
-        addLeafDisc(point, height * range(rng, 0.05, 0.075));
+      // Внизу ветвей больше, у вершины — меньше; сосна растёт редкими пучками
+      // вокруг ствола, но с плотной сердцевиной кроны.
+      const branches = type === 'pine'
+        ? Math.max(3, Math.round((5 + (1 - t) * 2) * detail))
+        : Math.max(6, Math.round((9 + (1 - t) * 6) * detail));
+
+      for (let i = 0; i < branches; i++) {
+        const angle = (i / branches) * Math.PI * 2 + tier * 0.8 + range(rng, -0.2, 0.2);
+        const reach = ringRadius * range(rng, 1 - preset.spread * 0.25, 1 + preset.spread * 0.2);
+        const px = centerX + Math.cos(angle) * reach;
+        const pz = centerZ + Math.sin(angle) * reach;
+        // Кончик ветки провисает: у ели сильнее, у пихты почти нет.
+        const py = y - preset.droop * height * (0.35 + 0.65 * (reach / (ringRadius + 1e-6)));
+        const size = height * range(rng, 0.035, 0.056) * (0.85 + (1 - t) * 0.45);
+
+        addLeafDisc([px, py, pz], size, false);
+
+        // Второй диск ниже и дальше от ствола: ветка растрёпанная, а не бусина.
+        if (rng() < (type === 'pine' ? 0.9 : 0.55)) {
+          addLeafDisc(
+            [
+              px + Math.cos(angle) * size * 0.9,
+              py - size * range(rng, 0.35, 0.8),
+              pz + Math.sin(angle) * size * 0.9,
+            ],
+            size * range(rng, 0.6, 0.85),
+            false,
+          );
+        }
+      }
+
+      // Сосна: плотная сердцевина кроны, иначе редкие пучки висят в воздухе.
+      if (type === 'pine') {
+        addLeafDisc([centerX, y, centerZ], height * 0.055 * density, false);
       }
     }
 
-    addFoliageCluster([0, height * 1.02, 0], height * 0.1, 4);
+    // Макушка: короткий побег, а не шар и не торчащий ствол.
+    const crown = axisAt(1);
+    addLeafDisc([crown[0], height * 1.005, crown[2]], height * 0.045 * (0.8 + detail * 0.3), false);
   }
 
   // --- Крона-оболочка (для лиственных) -----------------------------------

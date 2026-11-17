@@ -44,6 +44,34 @@ test('ствол кривого дерева не рвётся: вершины �
   }
 });
 
+test('хвойные силуэты различаются и не обрастают листьями', () => {
+  const trees = ['spruce', 'fir', 'pine'].map((conifer) =>
+    buildTree({ seed: 'conifer', params: { conifer, height: 1.5 } }));
+
+  for (const tree of trees) {
+    assert.equal(tree.foliage, 'conical');
+    assert.equal(
+      tree.polys.filter((poly) => poly.group === 'foliage' && poly.pts.length === 3).length,
+      0,
+      'у хвои не должно быть широких листьев',
+    );
+  }
+
+  assert.notEqual(JSON.stringify(trees[0]), JSON.stringify(trees[1]));
+  assert.notEqual(JSON.stringify(trees[1]), JSON.stringify(trees[2]));
+
+  const width = (tree) => tree.bounds.max[0] - tree.bounds.min[0];
+  assert.ok(width(trees[0]) < width(trees[1]), 'ель уже пихты');
+});
+
+test('у лиственного дерева есть узлы листьев', () => {
+  const tree = buildTree({ seed: 'oak-3', params: { foliage: 'round', detail: 1 } });
+  const leaves = tree.polys.filter((poly) => poly.group === 'foliage' && poly.pts.length === 3);
+
+  assert.ok(leaves.length > 20, `листьев всего ${leaves.length}`);
+  assert.ok(leaves.every((leaf) => leaf.color.length === 3));
+});
+
 test('все цвета дерева валидны', () => {
   const tree = buildTree({ seed: 'tree-colors' });
 
