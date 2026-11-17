@@ -125,12 +125,26 @@ export function buildTree(options = {}) {
    * @param {number} sides
    */
   function addTube(points, radii, color, sides) {
+    // Кадр кольца переносится с предыдущего кольца (parallel transport).
+    // Если каждый раз строить его от «верха» [0,1,0], то на крутом изгибе
+    // кадр перескакивает на 90° и труба выворачивается — в стволе появляется
+    // разлом. Перенос поворачивает кадр вместе с осью, без рывков.
+    let frame = null;
+
     const rings = points.map((point, index) => {
       const before = points[Math.max(0, index - 1)];
       const after = points[Math.min(points.length - 1, index + 1)];
       const tangent = normalize(sub(after, before));
       const helper = Math.abs(tangent[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
-      const u = normalize(cross(tangent, helper));
+
+      if (!frame) {
+        frame = normalize(cross(tangent, helper));
+      } else {
+        frame = normalize(sub(frame, scale(tangent, dot(frame, tangent))));
+        if (length(frame) < 1e-9) frame = normalize(cross(tangent, helper));
+      }
+
+      const u = frame;
       const v = normalize(cross(tangent, u));
       const radius = radii[index];
 

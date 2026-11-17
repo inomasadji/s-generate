@@ -30,6 +30,20 @@ test('кустарник ниже дерева и состоит из неско
   assert.ok(shrub.polys.length > 100);
 });
 
+test('ствол кривого дерева не рвётся: вершины конечны', () => {
+  for (const seed of ['rock', 'demo', 'aaa', 'ccc']) {
+    const tree = buildTree({ seed, habit: 'crooked' });
+
+    for (const poly of tree.polys) {
+      for (const point of poly.pts) {
+        for (const value of point) {
+          assert.ok(Number.isFinite(value), `${seed}: ${value}`);
+        }
+      }
+    }
+  }
+});
+
 test('все цвета дерева валидны', () => {
   const tree = buildTree({ seed: 'tree-colors' });
 
