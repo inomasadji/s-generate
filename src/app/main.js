@@ -1,4 +1,5 @@
 import { css, getPalette } from '../core/palette.js';
+import { nextSeed } from '../core/rng.js';
 import { downloadBlob, plateFileName, renderPng } from '../export/png.js';
 import { buildDisplayList } from '../render/build.js';
 import { layout } from '../render/layout.js';
@@ -9,49 +10,61 @@ import { buildSpecimen } from '../scene/specimen.js';
 const canvas = document.querySelector('#stage');
 const ctx = canvas.getContext('2d');
 const saveButton = document.querySelector('#save');
+const nextButton = document.querySelector('#next');
 const modeButton = document.querySelector('#mode');
 const kindSelect = document.querySelector('#kind');
 
-const params = new URLSearchParams(location.search);
-const seed = params.get('seed') || 'demo';
-const palette = getPalette(params.get('palette') || 'paper');
-const mode = params.get('mode') === 'scene' ? 'scene' : 'plate';
-const kind = params.get('kind') || 'mushroom';
+/**
+ * Параметры кадра. Перегенерация меняет только сид: род, режим, палитра и
+ * характер объекта должны пережить клик, иначе «ещё» превращается в лотерею.
+ */
+let options = readOptions();
+let scene;
+let palette;
 
-const scene = mode === 'scene'
-  ? buildLandscape({ seed, palette })
-  : buildSpecimen({
-    kind,
-    seed,
-    palette,
-    shape: params.get('shape') || undefined,
-    habit: params.get('habit') || undefined,
-  });
+/**
+ * Всё состояние кадра живёт в URL: ссылку можно переслать, и она откроет
+ * ровно тот же кадр. Разбор вынесен в функцию, чтобы popstate читал его же.
+ */
+function readOptions() {
+  const query = new URLSearchParams(location.search);
+  return {
+    seed: query.get('seed') || 'demo',
+    mode: query.get('mode') === 'scene' ? 'scene' : 'plate',
+    kind: query.get('kind') || 'mushroom',
+    palette: query.get('palette') || 'paper',
+    shape: query.get('shape') || undefined,
+    habit: query.get('habit') || undefined,
+  };
+}
 
-// Для скриншотов и встраивания: чистая картинка без панели.
-if (params.get('ui') === '0') document.querySelector('.toolbar').hidden = true;
+function build() {
+  palette = getPalette(options.palette);
+  scene = options.mode === 'scene'
+    ? buildLandscape({ seed: options.seed, palette })
+    : buildSpecimen({
+      kind: options.kind,
+      seed: options.seed,
+      palette,
+      shape: options.shape,
+      habit: options.habit,
+    });
 
-document.documentElement.style.setProperty('--ink', css(palette.ink));
-document.documentElement.style.setProperty('--accent', css(palette.accent));
-document.documentElement.style.setProperty('--paper', css(palette.paper));
-document.title = `${scene.name.full} — s-generate`;
+  document.documentElement.style.setProperty('--ink', css(palette.ink));
+  document.documentElement.style.setProperty('--accent', css(palette.accent));
+  document.documentElement.style.setProperty('--paper', css(palette.paper));
+  document.title = `${scene.name.full} — s-generate`;
 
-kindSelect.value = mode === 'plate' ? scene.kind : 'mushroom';
-kindSelect.hidden = mode === 'scene';
+  syncControls();
+  render();
+}
 
-kindSelect.addEventListener('change', () => {
-  const next = new URLSearchParams(location.search);
-  next.set('kind', kindSelect.value);
-  next.delete('shape');
-  location.search = next.toString();
-});
-
-modeButton.textContent = mode === 'scene' ? 'Плашка' : 'Сцена';
-modeButton.addEventListener('click', () => {
-  const next = new URLSearchParams(location.search);
-  next.set('mode', mode === 'scene' ? 'plate' : 'scene');
-  location.search = next.toString();
-});
+/** Контролы повторяют URL: после «назад» в браузере они не должны врать. */
+function syncControls() {
+  kindSelect.hidden = options.mode === 'scene';
+  kindSelect.value = options.mode === 'plate' ? scene.kind : 'mushroom';
+  modeButton.textContent = options.mode === 'scene' ? 'Плашка' : 'Сцена';
+}
 
 function render() {
   const rect = canvas.getBoundingClientRect();
@@ -66,6 +79,59 @@ function render() {
 
   paint(ctx, buildDisplayList(scene, view), view);
 }
+
+/**
+ * Новый сид — та же сцена, другой вариант. Цепочка детерминирована, поэтому
+ * «ещё», «ещё», «ещё» из одного и того же места всегда даёт один и тот же
+ * ряд кадров; браузеру остаётся только отрисовать готовый display list.
+ */
+function regenerate() {
+  const query = new URLSearchParams(location.search);
+  options.seed = nextSeed(options.seed);
+  query.set('seed', options.seed);
+
+  // Предыдущий вариант остаётся в истории: «назад» возвращает прошлый кадр.
+  history.pushState({ seed: options.seed }, '', `${location.pathname}?${query}`);
+  build();
+}
+
+// Для скриншотов и встраивания: чистая картинка без панели.
+if (new URLSearchParams(location.search).get('ui') === '0') {
+  document.querySelector('.toolbar').hidden = true;
+}
+
+kindSelect.addEventListener('change', () => {
+  const next = new URLSearchParams(location.search);
+  next.set('kind', kindSelect.value);
+  next.delete('shape');
+  location.search = next.toString();
+});
+
+modeButton.addEventListener('click', () => {
+  const next = new URLSearchParams(location.search);
+  next.set('mode', options.mode === 'scene' ? 'plate' : 'scene');
+  location.search = next.toString();
+});
+
+nextButton.addEventListener('click', regenerate);
+
+window.addEventListener('popstate', () => {
+  options = readOptions();
+  build();
+});
+
+window.addEventListener('keydown', (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+  // Пробел и R на кнопке или в списке — это действие самого контрола.
+  if (event.target instanceof Element && event.target.closest('button, select, input, textarea')) return;
+
+  const key = event.key.toLowerCase();
+  if (event.key !== ' ' && key !== 'r' && key !== 'к') return;
+
+  event.preventDefault();
+  regenerate();
+});
 
 saveButton.addEventListener('click', async () => {
   const label = saveButton.textContent;
@@ -91,4 +157,4 @@ saveButton.addEventListener('click', async () => {
 });
 
 window.addEventListener('resize', render);
-render();
+build();

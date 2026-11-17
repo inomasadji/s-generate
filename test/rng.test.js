@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { chance, gauss, hashSeed, int, makeRng, pick, range, rngStream } from '../src/core/rng.js';
+import { chance, gauss, hashSeed, int, makeRng, nextSeed, pick, range, rngStream } from '../src/core/rng.js';
 
 test('hashSeed стабилен и не выходит за uint32', () => {
   assert.equal(hashSeed('demo'), 2935829814);
@@ -75,6 +75,25 @@ test('range и int не выходят за границы', () => {
   }
 
   assert.equal(int(makeRng(1), 0, 0), 0);
+});
+
+test('nextSeed: детерминированная цепочка без повторов', () => {
+  assert.equal(nextSeed('demo'), nextSeed('demo'));
+  assert.notEqual(nextSeed('demo'), nextSeed('other'));
+
+  const seen = new Set();
+  let seed = 'demo';
+
+  for (let step = 0; step < 200; step++) {
+    seed = nextSeed(seed);
+    assert.match(seed, /^[a-z0-9]{6}$/, `странный сид: ${seed}`);
+    // Похожие символы (i, l, o, 0, 1) в алфавит не входят: сид набирают руками.
+    assert.doesNotMatch(seed, /[ilo01]/);
+    assert.ok(!seen.has(seed), `цепочка зациклилась на шаге ${step}: ${seed}`);
+    seen.add(seed);
+  }
+
+  assert.match(nextSeed('demo', 4), /^[a-z0-9]{4}$/);
 });
 
 test('pick, chance и gauss ведут себя предсказуемо', () => {

@@ -46,6 +46,32 @@ export function rngStream(seed, name) {
   return makeRng(hashSeed(`${seed}:${name}`));
 }
 
+/** Без похожих друг на друга символов: сид придётся читать и набирать руками. */
+const SEED_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+/**
+ * Следующий сид в цепочке. Кнопка «ещё» не спрашивает браузер о случайности:
+ * из любого сида получается ровно один следующий. Поэтому серия кадров
+ * воспроизводима, тест стабилен, а сид в URL остаётся коротким.
+ *
+ * @param {string} seed
+ * @param {number} [length]
+ * @returns {string}
+ */
+export function nextSeed(seed, length = 6) {
+  let h = hashSeed(`${seed}:next`);
+  let out = '';
+
+  for (let i = 0; i < length; i++) {
+    out += SEED_ALPHABET[h % SEED_ALPHABET.length];
+    h = Math.floor(h / SEED_ALPHABET.length);
+    // 32 бита на длинный сид не хватает: добираем остаток новым хэшем.
+    if (h === 0) h = hashSeed(`${seed}:next:${i}:${out}`);
+  }
+
+  return out;
+}
+
 /**
  * @param {() => number} rng
  * @param {number} lo
