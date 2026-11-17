@@ -121,83 +121,152 @@ export function buildMountains(seed, palette) {
   const ranges = [
     {
       baseY: 440,
-      minY: 292,
-      maxY: 336,
+      minY: 300,
+      maxY: 350,
       color: mixColor(palette.mountain, palette.skyBottom, 0.38),
       snowLine: 0,
+      count: int(rng, 3, 4),
     },
     {
       baseY: 470,
       minY: 318,
-      maxY: 368,
+      maxY: 372,
       color: palette.mountain,
-      snowLine: 362,
+      snowLine: 350,
+      count: int(rng, 2, 3),
     },
   ];
 
-  for (const plan of ranges) {
-    const peaks = int(rng, 3, 5);
+  /**
+   * Хребет из неравных вершин: у каждой своя ширина и высота, одна — главная.
+   * Ширина меряется в пикселях сцены, поэтому 720×720 остаётся прежним.
+   *
+   * @param {object} plan
+   */
+  function addRange(plan) {
     const ridge = [[-40, plan.baseY]];
     const tops = [];
 
-    for (let i = 0; i < peaks; i++) {
-      const x = -20 + ((i + 0.5) / peaks) * 760 + range(rng, -26, 26);
-      const y = range(rng, plan.minY, plan.maxY);
-      const left = range(rng, 30, 52);
-      const right = range(rng, 22, 40);
+    const weights = Array.from({ length: plan.count }, () => range(rng, 0.5, 1.8));
+    const total = weights.reduce((sum, value) => sum + value, 0);
 
-      tops.push([x, y]);
-      ridge.push([x - left, Math.min(plan.baseY, y + range(rng, 20, 42))]);
-      ridge.push([x, y]);
-      ridge.push([x + right, Math.min(plan.baseY, y + range(rng, 18, 38))]);
+    const peaks = [];
+    let cursor = -20;
 
-      if (i < peaks - 1) {
-        ridge.push([x + (760 / peaks) * range(rng, 0.35, 0.55), Math.min(plan.baseY, y + range(rng, 55, 90))]);
-      }
+    for (let i = 0; i < plan.count; i++) {
+      const share = (weights[i] / total) * 760;
+      peaks.push({ x: cursor + share / 2, y: range(rng, plan.minY, plan.maxY) });
+      cursor += share;
+    }
+
+    // Главная вершина и приниженные соседи: без этого хребет — расчёска.
+    const main = int(rng, 0, plan.count - 1);
+    peaks[main].y = Math.min(
+      peaks[main].y,
+      range(rng, plan.minY, plan.minY + (plan.maxY - plan.minY) * 0.25),
+    );
+    for (let i = 0; i < plan.count; i++) {
+      if (i === main) continue;
+      peaks[i].y += (plan.baseY - peaks[i].y) * range(rng, 0.08, 0.24);
+    }
+
+    for (let i = 0; i < plan.count; i++) {
+      const peak = peaks[i];
+      const leftBound = i === 0 ? -40 : (peaks[i - 1].x + peak.x) / 2;
+      const rightBound = i === plan.count - 1 ? 760 : (peak.x + peaks[i + 1].x) / 2;
+
+      if (i > 0) ridge.push([leftBound, Math.min(plan.baseY, peak.y + range(rng, 55, 95))]);
+
+      const leftX = peak.x - (peak.x - leftBound) * range(rng, 0.35, 0.95);
+      const rightX = peak.x + (rightBound - peak.x) * range(rng, 0.35, 0.95);
+
+      ridge.push([leftX, Math.min(plan.baseY, peak.y + range(rng, 18, 42))]);
+      ridge.push([peak.x, peak.y]);
+      ridge.push([rightX, Math.min(plan.baseY, peak.y + range(rng, 16, 40))]);
+
+      tops.push({ x: peak.x, y: peak.y });
     }
 
     ridge.push([760, plan.baseY]);
+
     items.push({
       pts: [...ridge, [760, plan.baseY + 24], [-40, plan.baseY + 24]],
       color: plan.color,
       layer: 1,
     });
 
-    if (plan.snowLine <= 0) continue;
+    return { ridge, tops };
+  }
 
-    for (const [x, y] of tops) {
-      // Отвесные скалы: тёмные полосы от вершины к подножию.
-      for (let cliff = 0; cliff < 1; cliff++) {
-        const cx = x + range(rng, -20, 20);
-        const topY = y + (plan.baseY - y) * range(rng, 0.15, 0.4);
+  for (const plan of ranges) {
+    const { ridge, tops } = addRange(plan);
+
+    if (plan.snowLine > 0) {
+      // Шапка — локальная, вокруг вершины: на пологих хребтах сцена не должна
+      // покрываться снегом до подножия. Края ищутся на самой ломаной хребта,
+      // поэтому снег лежит на склоне, а не висит над ним.
+      const ridgeYAt = (x) => {
+        const clamped = Math.min(760, Math.max(-40, x));
+        for (let i = 1; i < ridge.length; i++) {
+          if (ridge[i][0] >= clamped) {
+            const [x0, y0] = ridge[i - 1];
+            const [x1, y1] = ridge[i];
+            const t = x1 === x0 ? 0 : (clamped - x0) / (x1 - x0);
+            return y0 + (y1 - y0) * t;
+          }
+        }
+        return ridge[ridge.length - 1][1];
+      };
+
+      for (const top of tops) {
+        if (top.y > plan.snowLine - 8) continue;
+
+        const half = (plan.snowLine - top.y) * 0.9 + 10;
+        const leftEdge = [top.x - half, ridgeYAt(top.x - half)];
+        const rightEdge = [top.x + half, ridgeYAt(top.x + half)];
+        const bottomY = Math.max(leftEdge[1], rightEdge[1]) + 2;
+
+        const bottom = [];
+        const parts = int(rng, 4, 7);
+        const depth = (plan.snowLine - top.y) * 0.2;
+
+        for (let i = 0; i <= parts; i++) {
+          const f = i / parts;
+          const x = rightEdge[0] + (leftEdge[0] - rightEdge[0]) * f;
+          const dip = depth * Math.sin(Math.PI * f) * (i % 2 === 0 ? range(rng, 0.6, 1) : range(rng, 0.15, 0.4));
+          bottom.push([x, bottomY + dip]);
+        }
+
         items.push({
-          pts: [
-            [cx - 4, topY],
-            [cx + 5, topY - 3],
-            [cx + 8, plan.baseY],
-            [cx - 2, plan.baseY],
-          ],
-          color: mixColor(palette.mountainShade, palette.ink, 0.12),
+          pts: [[top.x, top.y], rightEdge, ...bottom, leftEdge],
+          color: palette.snow,
           layer: 1,
         });
       }
 
-      if (y >= plan.snowLine) continue;
-      const width = (plan.snowLine - y) * 0.8;
-      const tongue = (plan.snowLine - y) * 0.45;
-      items.push({
-        pts: [
-          [x, y],
-          [x + width, plan.snowLine],
-          [x + width * 0.4, plan.snowLine + tongue * 0.5],
-          [x + width * 0.2, plan.snowLine - 3],
-          [x - width * 0.05, plan.snowLine + tongue],
-          [x - width * 0.25, plan.snowLine - 2],
-          [x - width * 0.9, plan.snowLine],
-        ],
-        color: palette.snow,
-        layer: 1,
-      });
+      // Скальные выходы у подножия: низкие широкие пятна вместо полос-столбов.
+      for (const top of tops) {
+        const patches = int(rng, 1, 2);
+
+        for (let i = 0; i < patches; i++) {
+          const cx = top.x + range(rng, -34, 8);
+          const base = plan.baseY - range(rng, 4, 16);
+          const rockHeight = range(rng, 10, 22);
+          const width = range(rng, 12, 26);
+
+          items.push({
+            pts: [
+              [cx - width, base - rockHeight * 0.35],
+              [cx - width * 0.5, base - rockHeight],
+              [cx + width * 0.1, base - rockHeight * 0.9],
+              [cx + width, base - rockHeight * 0.15],
+              [cx + width * 0.2, base],
+            ],
+            color: mixColor(palette.mountainShade, palette.ink, 0.14),
+            layer: 1,
+          });
+        }
+      }
     }
   }
 

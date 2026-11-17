@@ -6,9 +6,27 @@ import { hashSeed } from '../src/core/rng.js';
 import { buildDisplayList } from '../src/render/build.js';
 import { layout } from '../src/render/layout.js';
 import { buildLandscape } from '../src/scene/landscape.js';
+import { buildMountains } from '../src/scene/scenery.js';
 
 const palette = getPalette('forest');
+const paper = getPalette('paper');
 const view = layout({ width: 900, height: 900, dpr: 1 });
+
+/** @param {[number, number]} point */
+function inside(point, pts) {
+  let result = false;
+
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if ((yi > point[1]) !== (yj > point[1]) &&
+        point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) {
+      result = !result;
+    }
+  }
+
+  return result;
+}
 
 function hashItems(items) {
   const text = items
@@ -70,4 +88,25 @@ test('сцена укладывается в бюджет полигонов', (
   const list = buildDisplayList(scene, view);
 
   assert.ok(list.items.length < 12000, `полигонов: ${list.items.length}`);
+});
+
+test('снеговые шапки в сцене лежат на хребте', () => {
+  for (const seed of ['scape-1', 'scape-2', 'hill', 'winter']) {
+    const items = buildMountains(seed, paper);
+    const front = items.find((item) => item.color === paper.mountain);
+    const caps = items.filter((item) => item.color === paper.snow);
+
+    assert.ok(front, `${seed}: нет переднего хребта`);
+
+    for (const cap of caps) {
+      for (const [x, y] of cap.pts) {
+        assert.ok(
+          inside([x, y], front.pts) ||
+            inside([x, y - 1e-6], front.pts) ||
+            inside([x, y + 1e-6], front.pts),
+          `${seed}: снег в (${x.toFixed(1)}, ${y.toFixed(1)}) вне горы`,
+        );
+      }
+    }
+  }
 });
