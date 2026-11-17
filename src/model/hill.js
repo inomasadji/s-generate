@@ -2,7 +2,7 @@ import { mixColor, shadeColor } from '../core/color.js';
 import { clamp, normalize } from '../core/math.js';
 import { createNoise } from '../core/noise.js';
 import { getPalette } from '../core/palette.js';
-import { range, rngStream } from '../core/rng.js';
+import { int, range, rngStream } from '../core/rng.js';
 import { buildTree } from './tree.js';
 
 /**
@@ -154,18 +154,54 @@ export function buildHill(options = {}) {
     }
   }
 
-  // Трава на ближнем плане: короткие лезвия вдоль гребня.
+  // Трава на ближнем плане: густая кромка и пучки по всему склону. Одиночные
+  // треугольники вдоль гребня читались как пунктир, а не как трава.
   const near = ridges[ridges.length - 1];
-  for (let i = 2; i < near.length - 2; i += 2) {
-    if (rng() < 0.3) continue;
+  const grassTone = mixColor(palette.grass, palette.leafDark, 0.3);
+  const grassLight = mixColor(palette.grass, palette.leaf, 0.4);
 
+  /**
+   * Пучок травы: 2–4 лезвия с разным наклоном и высотой.
+   *
+   * @param {number} x
+   * @param {number} y
+   * @param {number} size
+   * @param {number[]} tone
+   */
+  function addTuft(x, y, size, tone) {
+    const blades = 3 + int(rng, 0, 2);
+
+    for (let blade = 0; blade < blades; blade++) {
+      const dx = range(rng, -0.35, 0.35) * size;
+      const tall = size * range(rng, 0.8, 1.6);
+      const lean = range(rng, -0.35, 0.35) * size;
+
+      push(
+        [
+          [x + dx - size * 0.08, y],
+          [x + dx + size * 0.08, y],
+          [x + dx + lean, y - tall],
+        ],
+        tone,
+        0.75,
+      );
+    }
+  }
+
+  // Кромка: шанс задаёт шум, поэтому ряд получается рваным, а не линейкой.
+  for (let i = 1; i < near.length - 1; i++) {
     const [x, y] = near[i];
-    const blade = range(rng, 0.02, 0.05);
-    push(
-      [[x - 0.008, y], [x + 0.008, y], [x + range(rng, -0.012, 0.012), y - blade]],
-      mixColor(palette.grass, palette.ink, 0.18),
-      0,
-    );
+    if (noise.fbm2(x * 7.5, 5.1, { octaves: 2 }) < -0.2) continue;
+    addTuft(x, y, range(rng, 0.018, 0.04), rng() < 0.45 ? grassLight : grassTone);
+  }
+
+  // Склон: пучки ниже гребня, чтобы трава была пятнами по всему холму.
+  const tufts = 22 + int(rng, 0, 10);
+  for (let i = 0; i < tufts; i++) {
+    const x = range(rng, -0.92, 0.92);
+    const top = sampleRidge(near, x);
+    const y = Math.max(-0.035, top - range(rng, 0.015, 0.22));
+    addTuft(x, y, range(rng, 0.012, 0.03), rng() < 0.4 ? grassLight : grassTone);
   }
 
   /**
@@ -207,7 +243,7 @@ export function buildHill(options = {}) {
     near,
     treeX,
     'near',
-    { height: range(rng, 0.55, 0.68), trunkRadius: 0.03, depth: 1, density: 1, foliage: 'round' },
+    { height: range(rng, 0.55, 0.68), trunkRadius: 0.03, depth: 1, density: 1, clusters: 32, foliage: 'round' },
     range(rng, 0.72, 0.9),
     palette.hillNear,
   );
@@ -216,7 +252,7 @@ export function buildHill(options = {}) {
     ridges[1],
     Math.max(-0.95, treeX - range(rng, 0.55, 0.8)),
     'far',
-    { height: range(rng, 0.38, 0.46), trunkRadius: 0.026, depth: 1, density: 1, foliage: 'round' },
+    { height: range(rng, 0.38, 0.46), trunkRadius: 0.026, depth: 1, density: 1, clusters: 22, foliage: 'round' },
     range(rng, 0.5, 0.62),
     mixColor(palette.hillFar, palette.hillNear, 0.55),
   );
