@@ -12,15 +12,58 @@
   <body>
     <canvas id="stage" role="img" aria-label="Генеративная сцена"></canvas>
     <div class="toolbar">
-      <select id="kind" aria-label="Что генерировать">
-        <option value="mushroom">Гриб</option>
-        <option value="tree">Дерево</option>
-        <option value="hill">Холм</option>
-        <option value="mountain">Гора</option>
-        <option value="cloud">Облако</option>
-      </select>
-      <button id="mode" type="button">Сцена</button>
+      <label class="field" id="kind-field">
+        <span>род</span>
+        <select id="kind" aria-label="Род">
+          <option value="mushroom">Гриб</option>
+          <option value="tree">Дерево</option>
+          <option value="hill">Холм</option>
+          <option value="mountain">Гора</option>
+          <option value="cloud">Облако</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>режим</span>
+        <select id="mode" aria-label="Режим">
+          <option value="plate">Плашка</option>
+          <option value="scene">Сцена</option>
+        </select>
+      </label>
+      <label class="field" id="shape-field">
+        <span>форма</span>
+        <select id="shape" aria-label="Форма гриба">
+          <option value="">Из сида</option>
+          <option value="classic">Классическая</option>
+          <option value="parasol">Зонтик</option>
+          <option value="porcini">Белый</option>
+          <option value="amanita">Мухомор</option>
+        </select>
+      </label>
+      <label class="field" id="habit-field">
+        <span>характер</span>
+        <select id="habit" aria-label="Характер дерева">
+          <option value="upright">Прямой</option>
+          <option value="column">Колонной</option>
+          <option value="weeping">Плакучий</option>
+          <option value="crooked">Кривой на камне</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>палитра</span>
+        <select id="palette" aria-label="Палитра">
+          <option value="paper">Бумага</option>
+          <option value="ink">Тушь</option>
+          <option value="forest">Лес</option>
+          <option value="meadow">Луг</option>
+          <option value="autumn">Осень</option>
+          <option value="sand">Пустыня</option>
+          <option value="dusk">Сумерки</option>
+          <option value="alpine">Альпы</option>
+          <option value="night">Ночь</option>
+        </select>
+      </label>
       <button id="next" type="button" title="Новый сид — пробел или R">Ещё</button>
+      <button id="dice" type="button" title="Случайный род, палитра и характер — D">Случайно</button>
       <button id="save" type="button">Скачать PNG</button>
     </div>
     <script type="module" src="src/app/main.js"></script>

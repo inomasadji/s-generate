@@ -8,6 +8,9 @@ import { splinePoint } from '../core/spline.js';
 const WOOD_LAYER = 0;
 const FOLIAGE_LAYER = 1;
 
+/** Характеры дерева; `upright` — обычный ствол без крайностей. */
+export const TREE_HABITS = Object.freeze(['upright', 'column', 'weeping', 'crooked']);
+
 /**
  * Дерево: ствол с корнями, ветки-трубы, крона из дисков.
  *

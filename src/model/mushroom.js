@@ -23,6 +23,9 @@ const PRESETS = {
   amanita: { capRadius: 1.05, spotCount: 12, ring: true, capProfile: 'convex' },
 };
 
+/** Формы, которые можно выбрать вручную. `classic` — базовые пропорции. */
+export const MUSHROOM_SHAPES = Object.freeze(['classic', 'parasol', 'porcini', 'amanita']);
+
 /**
  * Гриб: ножка-свип, шляпка-вращение с тремя слоями шума, пятна.
  * Всё в локальных координатах, основание — в `y = 0`.
