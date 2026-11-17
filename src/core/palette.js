@@ -152,7 +152,124 @@ export const PALETTES = Object.freeze({
     leafDark: [52, 78, 70],
     grass: [104, 124, 110],
   }),
+
+  // Луг: светлая зелень, тёплое солнце, почти без пыли.
+  meadow: theme({
+    paper: [246, 243, 226],
+    shade: [222, 222, 200],
+    muted: [116, 124, 96],
+    ink: [32, 40, 28],
+    accent: [204, 118, 60],
+    stem: [240, 230, 200],
+    cap: [198, 104, 66],
+    capShade: [152, 72, 44],
+    spot: [252, 248, 234],
+    skyTop: [150, 194, 216],
+    skyBottom: [232, 240, 218],
+    sun: [250, 222, 148],
+    cloud: [253, 251, 242],
+    mountain: [162, 176, 172],
+    mountainShade: [130, 146, 144],
+    snow: [253, 253, 249],
+    hillFar: [170, 192, 148],
+    hillNear: [122, 158, 100],
+    ground: [148, 166, 108],
+    wood: [124, 100, 72],
+    leaf: [106, 148, 78],
+    leafDark: [76, 112, 58],
+    grass: [116, 148, 74],
+  }),
+
+  // Пустыня: охра, терракота, пыльные фиолетовые дали.
+  sand: theme({
+    paper: [238, 226, 202],
+    shade: [212, 198, 172],
+    muted: [138, 118, 92],
+    ink: [46, 36, 28],
+    accent: [186, 86, 50],
+    stem: [232, 214, 184],
+    cap: [176, 102, 66],
+    capShade: [134, 72, 46],
+    spot: [248, 238, 218],
+    skyTop: [198, 180, 166],
+    skyBottom: [240, 216, 178],
+    sun: [244, 198, 130],
+    cloud: [246, 234, 216],
+    mountain: [158, 134, 124],
+    mountainShade: [128, 106, 100],
+    snow: [246, 240, 228],
+    hillFar: [192, 168, 130],
+    hillNear: [166, 140, 102],
+    ground: [190, 162, 120],
+    wood: [122, 94, 66],
+    leaf: [164, 146, 88],
+    leafDark: [128, 114, 70],
+    grass: [174, 154, 100],
+  }),
+
+  // Тушь: почти монохром, один тёплый акцент — как гравюра с сургучом.
+  ink: theme({
+    paper: [238, 236, 230],
+    shade: [214, 212, 204],
+    muted: [122, 122, 118],
+    ink: [26, 26, 26],
+    accent: [150, 58, 48],
+    stem: [216, 212, 202],
+    cap: [128, 124, 118],
+    capShade: [98, 94, 90],
+    spot: [246, 244, 238],
+    skyTop: [206, 208, 206],
+    skyBottom: [234, 232, 226],
+    sun: [226, 222, 210],
+    cloud: [242, 240, 234],
+    mountain: [158, 158, 154],
+    mountainShade: [128, 128, 124],
+    snow: [248, 248, 246],
+    hillFar: [170, 172, 168],
+    hillNear: [138, 140, 136],
+    ground: [160, 156, 148],
+    wood: [104, 98, 90],
+    leaf: [132, 134, 128],
+    leafDark: [96, 98, 94],
+    grass: [124, 126, 118],
+  }),
+
+  // Ночь: тёмная бумага, лунный свет, холодные листья. `ink` здесь светлый,
+  // поэтому рамка и подпись плашки читаются на тёмном фоне.
+  night: theme({
+    paper: [28, 34, 52],
+    shade: [42, 50, 72],
+    muted: [140, 150, 174],
+    ink: [234, 235, 226],
+    accent: [216, 140, 98],
+    stem: [184, 182, 172],
+    cap: [124, 76, 90],
+    capShade: [90, 54, 68],
+    spot: [228, 226, 216],
+    skyTop: [22, 28, 56],
+    skyBottom: [88, 94, 132],
+    sun: [228, 224, 196],
+    cloud: [122, 130, 158],
+    mountain: [68, 76, 106],
+    mountainShade: [50, 56, 82],
+    snow: [198, 204, 216],
+    hillFar: [60, 78, 90],
+    hillNear: [42, 58, 70],
+    ground: [36, 42, 52],
+    wood: [88, 74, 66],
+    leaf: [60, 86, 82],
+    leafDark: [42, 62, 62],
+    grass: [54, 74, 66],
+  }),
 });
+
+/**
+ * Порядок тем в интерфейсе: от бумаги и туши через времена года к ночи.
+ * @type {readonly string[]}
+ */
+export const PALETTE_IDS = Object.freeze([
+  'paper', 'ink', 'forest', 'meadow', 'autumn', 'sand', 'dusk', 'alpine', 'night',
+]);
 
 /**
  * Имя темы по объекту палитры: пригодится, когда решение зависит от темы,
@@ -164,10 +281,14 @@ for (const [name, palette] of Object.entries(PALETTES)) PALETTE_NAMES.set(palett
 
 const SEASON_BY_PALETTE = {
   paper: 'summer',
+  ink: 'summer',
   forest: 'summer',
+  meadow: 'summer',
+  sand: 'summer',
   dusk: 'spring',
   autumn: 'autumn',
   alpine: 'winter',
+  night: 'summer',
 };
 
 /**
