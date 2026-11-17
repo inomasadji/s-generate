@@ -93,17 +93,20 @@ test('сцена укладывается в бюджет полигонов', (
 test('снеговые шапки в сцене лежат на хребте', () => {
   for (const seed of ['scape-1', 'scape-2', 'hill', 'winter']) {
     const items = buildMountains(seed, paper);
-    const front = items.find((item) => item.color === paper.mountain);
-    const caps = items.filter((item) => item.color === paper.snow);
+    const front = items.filter((item) => item.role === 'mountain-front');
+    const caps = items.filter((item) => item.role === 'snow');
 
-    assert.ok(front, `${seed}: нет переднего хребта`);
+    assert.ok(front.length > 0, `${seed}: нет переднего хребта`);
+
+    const onMountain = (x, y) => front.some((facet) =>
+      inside([x, y], facet.pts) ||
+      inside([x, y - 1e-6], facet.pts) ||
+      inside([x, y + 1e-6], facet.pts));
 
     for (const cap of caps) {
       for (const [x, y] of cap.pts) {
         assert.ok(
-          inside([x, y], front.pts) ||
-            inside([x, y - 1e-6], front.pts) ||
-            inside([x, y + 1e-6], front.pts),
+          onMountain(x, y),
           `${seed}: снег в (${x.toFixed(1)}, ${y.toFixed(1)}) вне горы`,
         );
       }

@@ -1,9 +1,13 @@
-import { mixColor } from '../core/color.js';
+import { mixColor, shadeColor } from '../core/color.js';
+import { clamp, normalize } from '../core/math.js';
 import { createNoise } from '../core/noise.js';
 import { int, range, rngStream } from '../core/rng.js';
 
 /** Линия горизонта в логических единицах. */
 export const HORIZON = 420;
+
+/** Свет в экранных координатах (y вниз): сверху-слева, как в мире. */
+const SCREEN_LIGHT = normalize([-0.45, -0.8, 0.55]);
 
 /**
  * @typedef {object} SceneryItem
@@ -12,6 +16,7 @@ export const HORIZON = 420;
  * @property {number} [alpha]
  * @property {number} layer полоса: солнце 0, горы 1, облака 2, холмы 3, трава 4
  * @property {number} [z]
+ * @property {string} [role] метка для отладки и тестов: `mountain-front`, `snow`…
  */
 
 /** @param {number} cx @param {number} cy @param {number} radius @param {number} [sides] */
@@ -126,6 +131,7 @@ export function buildMountains(seed, palette) {
       color: mixColor(palette.mountain, palette.skyBottom, 0.38),
       snowLine: 0,
       count: int(rng, 3, 4),
+      role: 'mountain-back',
     },
     {
       baseY: 470,
@@ -134,6 +140,7 @@ export function buildMountains(seed, palette) {
       color: palette.mountain,
       snowLine: 350,
       count: int(rng, 2, 3),
+      role: 'mountain-front',
     },
   ];
 
@@ -189,11 +196,20 @@ export function buildMountains(seed, palette) {
 
     ridge.push([760, plan.baseY]);
 
-    items.push({
-      pts: [...ridge, [760, plan.baseY + 24], [-40, plan.baseY + 24]],
-      color: plan.color,
-      layer: 1,
-    });
+    // Хребет из фасетов: у каждой вершины появляется теневая сторона.
+    // Сцена не обводит рельеф контуром, поэтому общие рёбра здесь безопасны.
+    for (let i = 0; i < ridge.length - 1; i++) {
+      const [x0, y0] = ridge[i];
+      const [x1, y1] = ridge[i + 1];
+      const slope = clamp((y1 - y0) / (x1 - x0), -3, 3);
+
+      items.push({
+        pts: [[x0, y0], [x1, y1], [x1, plan.baseY], [x0, plan.baseY]],
+        color: shadeColor(plan.color, normalize([slope * 1.4, -1, 0.6]), SCREEN_LIGHT),
+        layer: 1,
+        role: plan.role,
+      });
+    }
 
     return { ridge, tops };
   }
@@ -241,6 +257,7 @@ export function buildMountains(seed, palette) {
           pts: [[top.x, top.y], rightEdge, ...bottom, leftEdge],
           color: palette.snow,
           layer: 1,
+          role: 'snow',
         });
       }
 
@@ -264,6 +281,7 @@ export function buildMountains(seed, palette) {
             ],
             color: mixColor(palette.mountainShade, palette.ink, 0.14),
             layer: 1,
+            role: 'rock',
           });
         }
       }
@@ -345,7 +363,7 @@ export function buildGrass(seed, palette) {
   const rng = rngStream(seed, 'grass');
   const items = [];
   const color = mixColor(palette.grass, palette.ground, 0.25);
-  const dark = mixColor(palette.grass, palette.ink, 0.16);
+  const dark = mixColor(palette.grass, palette.leafDark, 0.3);
   const count = int(rng, 18, 28);
 
   for (let i = 0; i < count; i++) {

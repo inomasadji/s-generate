@@ -23,6 +23,22 @@ function inside(point, pts) {
   return result;
 }
 
+/** Хребет собирается из верхних рёбер фасетов: они общие и стыкуются по x. */
+function ridgeOf(facets) {
+  const ys = new Map();
+
+  for (const facet of facets) {
+    for (const [x, y] of facet.pts.slice(0, 2)) {
+      const key = x.toFixed(6);
+      ys.set(key, Math.max(ys.get(key) ?? -Infinity, y));
+    }
+  }
+
+  return [...ys.entries()]
+    .map(([x, y]) => [Number(x), y])
+    .sort((a, b) => a[0] - b[0]);
+}
+
 test('гора детерминирована', () => {
   const a = buildMountain({ seed: 'mt-1', palette });
   const b = buildMountain({ seed: 'mt-1', palette });
@@ -35,19 +51,20 @@ test('гора детерминирована', () => {
 test('снег лежит на горе, а не висит в воздухе', () => {
   for (const seed of SEEDS) {
     const mountain = buildMountain({ seed, palette });
-    const body = mountain.polys.find((poly) => poly.group === 'mountain');
+    const facets = mountain.polys.filter((poly) => poly.group === 'mountain');
     const caps = mountain.polys.filter((poly) => poly.group === 'snow');
 
-    assert.ok(body, `${seed}: нет хребта`);
+    assert.ok(facets.length > 0, `${seed}: нет хребта`);
+
+    const onMountain = (x, y) => facets.some((facet) =>
+      inside([x, y], facet.pts) ||
+      inside([x, y - 1e-6], facet.pts) ||
+      inside([x, y + 1e-6], facet.pts));
 
     for (const cap of caps) {
       for (const [x, y] of cap.pts) {
-        // Вершина шапки может лежать ровно на кромке: сдвиг на эпсилон вниз
-        // (внутрь горы) отличает «на склоне» от «в небе».
         assert.ok(
-          inside([x, y], body.pts) ||
-            inside([x, y - 1e-6], body.pts) ||
-            inside([x, y + 1e-6], body.pts),
+          onMountain(x, y),
           `${seed}: снег в (${x.toFixed(3)}, ${y.toFixed(3)}) вне горы`,
         );
       }
@@ -58,17 +75,35 @@ test('снег лежит на горе, а не висит в воздухе', 
 test('вершины гор разной высоты: есть главная', () => {
   for (const seed of SEEDS) {
     const mountain = buildMountain({ seed, palette });
-    const body = mountain.polys.find((poly) => poly.group === 'mountain');
+    const ridge = ridgeOf(mountain.polys.filter((poly) => poly.group === 'mountain'));
     const peaks = [];
 
-    for (let i = 1; i < body.pts.length - 1; i++) {
-      const [, y] = body.pts[i];
-      if (y > body.pts[i - 1][1] && y > body.pts[i + 1][1]) peaks.push(y);
+    for (let i = 1; i < ridge.length - 1; i++) {
+      if (ridge[i][1] > ridge[i - 1][1] && ridge[i][1] > ridge[i + 1][1]) {
+        peaks.push(ridge[i][1]);
+      }
     }
 
     assert.ok(peaks.length >= 2, `${seed}: вершин ${peaks.length}`);
     const spread = Math.max(...peaks) - Math.min(...peaks);
     assert.ok(spread > 0.06, `${seed}: вершины почти одной высоты (${spread.toFixed(3)})`);
+  }
+});
+
+/** Яркость в 0..255: для проверки, что свет и тень действительно различаются. */
+function luminance([r, g, b]) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+test('у гор есть освещённые и теневые грани', () => {
+  for (const seed of SEEDS) {
+    const facets = buildMountain({ seed, palette }).polys.filter((poly) => poly.group === 'mountain');
+    const colors = new Set(facets.map((facet) => facet.color.join(',')));
+    const values = facets.map((facet) => luminance(facet.color));
+    const spread = Math.max(...values) - Math.min(...values);
+
+    assert.ok(colors.size >= 3, `${seed}: граней всего ${colors.size}`);
+    assert.ok(spread > 30, `${seed}: свет и тень почти одинаковы (${spread.toFixed(1)})`);
   }
 });
 

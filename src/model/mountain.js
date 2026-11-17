@@ -1,4 +1,5 @@
-import { mixColor } from '../core/color.js';
+import { mixColor, shadeColor } from '../core/color.js';
+import { clamp, normalize } from '../core/math.js';
 import { getPalette } from '../core/palette.js';
 import { int, range, rngStream } from '../core/rng.js';
 
@@ -95,6 +96,29 @@ export function buildMountain(options = {}) {
   }
 
   /**
+   * Хребет разбит на фасеты: наклон грани задаёт ступень света, поэтому у
+   * каждой вершины есть освещённая и теневая сторона, а не одна заливка.
+   * Общие рёбра фасетов не обводятся: контур рисует только внешний силуэт.
+   *
+   * @param {[number, number][]} points
+   * @param {number[]} color
+   * @param {string} group
+   */
+  function addFacets(points, color, group) {
+    for (let i = 0; i < points.length - 1; i++) {
+      const [x0, y0] = points[i];
+      const [x1, y1] = points[i + 1];
+      const slope = clamp((y1 - y0) / (x1 - x0), -2.6, 2.6);
+
+      push(
+        [[x0, y0], [x1, y1], [x1, 0], [x0, 0]],
+        shadeColor(color, normalize([-slope * 1.3, 1, 0.6])),
+        group,
+      );
+    }
+  }
+
+  /**
    * Точка на отрезке «вершина → плечо», где склон пересекает снеговую линию.
    *
    * @param {[number, number]} peak
@@ -113,30 +137,18 @@ export function buildMountain(options = {}) {
   }
 
   const back = makeRidge(int(rng, 3, 4), 0.42, 0.72);
-  push(
-    [...back.points, [1.05, 0.02], [-1.05, 0.02]],
+  addFacets(
+    back.points,
     mixColor(palette.mountain, palette.skyBottom, 0.32),
     'mountain-back',
   );
 
   const front = makeRidge(int(rng, 2, 3), 0.55, 1);
-  push(front.points, palette.mountain, 'mountain');
+  addFacets(front.points, palette.mountain, 'mountain');
 
-  // Теневые склоны: правый склон каждой вершины уходит в тень, свет — слева.
+  // Скальные выходы: низкие широкие пятна у подножия. Узкие полосы во всю
+  // высоту читались как столбы, а не как скалы.
   for (const top of front.tops) {
-    const shoulderX = front.points[top.right][0];
-    push(
-      [
-        [top.x, top.y],
-        [Math.max(top.x + 0.04, shoulderX), 0],
-        [top.x + 0.015, 0],
-      ],
-      mixColor(palette.mountain, palette.mountainShade, 0.8),
-      'mountain-shade',
-    );
-
-    // Скальные выходы: низкие широкие пятна у подножия. Узкие полосы во всю
-    // высоту читались как столбы, а не как скалы.
     const patches = int(rng, 1, 2);
     for (let i = 0; i < patches; i++) {
       const cx = top.x + range(rng, -0.18, 0.06);
